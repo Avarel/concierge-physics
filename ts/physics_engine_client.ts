@@ -23,8 +23,8 @@ export interface FetchEntities {
     type: "FETCH_ENTITIES"
 }
 
-export interface FetchPosition {
-    type: "FETCH_POSITION"
+export interface FetchPositions {
+    type: "FETCH_POSITIONS"
 }
 
 export interface EntityDump {
@@ -37,7 +37,7 @@ export interface PositionDump {
     updates: EntityUpdate[]
 }
 
-type PhysicsPayload = EntityDump | PositionDump | FetchEntities | FetchPosition;
+type PhysicsPayload = EntityDump | PositionDump | FetchEntities | FetchPositions;
 
 const PHYSICS_ENGINE_NAME = "physics_engine";
 const PHYSICS_ENGINE_GROUP = "physics_engine_out";
@@ -48,15 +48,15 @@ function vec2f2vector2(vec: Vec2f): Vector2 {
     return new Vector2(vec.x, vec.y);
 }
 
-class PhysicsSimulationClient {
+export class PhysicsSimulationClient {
     readonly name: string;
     readonly socket: WebSocket;
     uuid!: ConciergeAPI.Uuid;
     subscribeInterval: number | undefined;
 
-    constructor(name: string) {
+    constructor(name: string, url: string) {
         this.name = name;
-        this.socket = new WebSocket("ws://127.0.0.1/ws");
+        this.socket = new WebSocket(url);
         this.socket.onopen = event => this.onOpen(event);
         this.socket.onmessage = event => this.onReceive(event);
         this.socket.onerror = event => console.log(event);
@@ -91,13 +91,16 @@ class PhysicsSimulationClient {
 
     private trySubscribe() {
         // try to subscribe until good ("STATUS" handle)
-        // @ts-ignore
-        this.subscribeInterval = setInterval(() => {
+        let subFn = () => {
+            console.log("Attempting to subscribe to ", PHYSICS_ENGINE_GROUP);
             this.send({
                 operation: "SUBSCRIBE",
                 group: PHYSICS_ENGINE_GROUP
             });
-        }, 5000);
+        };
+
+        subFn();
+        this.subscribeInterval = setInterval(subFn, 5000);
     }
 
     private cancelSubscribe() {
@@ -132,6 +135,11 @@ class PhysicsSimulationClient {
                 break;
             case "STATUS":
                 switch (payload.code) {
+                    case ConciergeAPI.StatusCode.NO_SUCH_GROUP:
+                        if (payload.data == PHYSICS_ENGINE_GROUP) {
+                            console.error("Group ", PHYSICS_ENGINE_GROUP, " does not exist on concierge, is the simulation server on?")
+                        }
+                        break;
                     case ConciergeAPI.StatusCode.SUBSCRIBED:
                         // subscription complete, stop trying to join
                         if (payload.data == PHYSICS_ENGINE_GROUP) {
@@ -156,7 +164,12 @@ class PhysicsSimulationClient {
     }
 
     private updateShape(id: string, centroid: Vec2f) {
-        renderer.shapes[id]?.moveTo(vec2f2vector2(centroid));
+        let shape = renderer.shapes[id];
+        if (shape) {
+            shape.moveTo(vec2f2vector2(centroid));
+        } else {
+            console.warn("Shape ", id, " not registered with client")
+        }
     }
 
     private processPhysicsPayload(payload: DeepImmutable<PhysicsPayload>) {

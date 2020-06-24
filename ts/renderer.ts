@@ -3,7 +3,7 @@ import * as BABYLON from 'babylonjs';
 
 export class Renderer {
     canvas: HTMLCanvasElement;
-    shapes: Record<string, Shape>;
+    shapes: { [_ in string]?: Shape };
     engine: Engine;
     scene?: Scene;
 
@@ -16,7 +16,7 @@ export class Renderer {
     clearShapes() {
         for (let key in this.shapes) {
             if (this.shapes.hasOwnProperty(key)) {
-                this.shapes[key].mesh.dispose();
+                this.shapes[key]!.mesh.dispose();
                 delete this.shapes[key];
             }
         }
@@ -26,9 +26,15 @@ export class Renderer {
         let scene = new Scene(this.engine);
         let camera = new UniversalCamera("UniversalCamera", new Vector3(0, 250, -250), scene);
         camera.setTarget(Vector3.Zero());
-        camera.speed = 10;
-        // camera.attachControl(this.canvas, true);
-    
+        camera.speed = 5;
+        camera.attachControl(this.canvas, true);
+        camera.keysDownward.push(17); //CTRL
+        camera.keysUpward.push(32); //SPACE
+        camera.keysUp.push(87);    //W
+        camera.keysDown.push(83)   //D
+        camera.keysLeft.push(65);  //A
+        camera.keysRight.push(68); //S
+
         let light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 10, 0), scene);
         light.intensity = 0.5;
 
@@ -36,20 +42,24 @@ export class Renderer {
     }
 
     createPolygon(id: string, centroid: Vector2, points: Vector2[], scale: number = 1) {
-        if (this.scene == undefined) {
-            this.scene = this.createScene();
+        if (this.scene) {
+            this.shapes[id] = Shape.createPolygon(centroid, points, this.scene, scale);
         }
-        this.shapes[id] = Shape.createPolygon(centroid, points, this.scene, scale);
     }
 
     start() {
-        let scene = this.createScene();
-        this.scene = scene;
-    
-        this.engine.runRenderLoop(() => {
-            console.log(scene);
-            scene.render();
-        });
+        if (this.scene == undefined) {
+            this.scene = this.createScene();
+        }
+
+        let renderFunc = () => {
+            if (this.scene) {
+                this.scene.render()
+            } else {
+                this.engine.stopRenderLoop(renderFunc)
+            }
+        };
+        this.engine.runRenderLoop(renderFunc);
     }
 
     stop() {

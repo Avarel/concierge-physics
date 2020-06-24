@@ -2,7 +2,7 @@ const path = require("path");
 
 module.exports = {
     entry: {
-        index: './ts/index.ts'
+        index: './ts/index.ts',
     },
     output: {
         filename: '[name].bundle.js',
@@ -16,6 +16,11 @@ module.exports = {
         rules: [
             { test: /\.tsx?$/, loader: "ts-loader" }
         ]
+    },
+    optimization: {
+        splitChunks: {
+            chunks: 'all',
+        },
     },
     mode: "development",
 };
