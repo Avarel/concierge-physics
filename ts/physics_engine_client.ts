@@ -79,13 +79,13 @@ export class PhysicsSimulationClient {
     }
 
     private onClose(event: CloseEvent) {
-        console.log(event.code, event.reason);
+        console.warn(event.code, event.reason);
         clearInterval(this.subscribeInterval);
     }
 
     private onReceive(event: MessageEvent) {
         let payload = JSON.parse(event.data) as ConciergeAPI.Payload<PhysicsPayload>;
-        console.log(payload);
+        // console.trace(payload);
         this.processConciergePayload(payload);
     }
 
@@ -109,6 +109,7 @@ export class PhysicsSimulationClient {
     }
 
     private onSubscribe() {
+        console.log("Subscribed!");
         this.send({
             operation: "MESSAGE",
             target: {
@@ -128,7 +129,7 @@ export class PhysicsSimulationClient {
                 this.trySubscribe();
                 break;
             case "MESSAGE":
-                if (payload.origin!.name != PHYSICS_ENGINE_GROUP) {
+                if (payload.origin!.name != PHYSICS_ENGINE_NAME) {
                     return;
                 }
                 this.processPhysicsPayload(payload.data as PhysicsPayload);
@@ -173,9 +174,9 @@ export class PhysicsSimulationClient {
     }
 
     private processPhysicsPayload(payload: DeepImmutable<PhysicsPayload>) {
-        console.log(payload);
         switch (payload.type) {
             case "ENTITY_DUMP":
+                console.log("Dumping entities!");
                 renderer.clearShapes();
                 for (let entity of payload.entities) {
                     this.createShape(entity.id, entity.centroid, entity.points);
@@ -185,6 +186,9 @@ export class PhysicsSimulationClient {
                 for (let update of payload.updates) {
                     this.updateShape(update.id, update.position);
                 }
+                break;
+            default:
+                console.log(payload);
                 break;
         }
     }

@@ -24,8 +24,8 @@ export class Renderer {
 
     createScene(): Scene {
         let scene = new Scene(this.engine);
-        let camera = new UniversalCamera("UniversalCamera", new Vector3(0, 250, -250), scene);
-        camera.setTarget(Vector3.Zero());
+        let camera = new UniversalCamera("UniversalCamera", new Vector3(500, 250, -250), scene);
+        camera.setTarget(new Vector3(500, 0, 500));
         camera.speed = 5;
         camera.attachControl(this.canvas, true);
         camera.keysDownward.push(17); //CTRL
@@ -79,7 +79,7 @@ export class Shape {
     static createPolygon(centroid: Vector2, points: Vector2[], scene: Scene, scale: number = 1): Shape {
         let corners = points.map((v) => v.scale(scale));
         let poly_tri = new BABYLON.PolygonMeshBuilder("polytri", corners, scene);
-        let mesh = poly_tri.build(undefined, 5);
+        let mesh = poly_tri.build(undefined, 50);
         return new Shape(centroid, mesh);
     }
 
