@@ -21,6 +21,7 @@ renderer.scene = renderer.createScene();
 // ];
 // renderer.createPolygon("wowzers", Vector2.Zero(), corners, 1);
 
-export let client = new PhysicsSimulationClient("anthony", "ws://127.0.0.1:8080/ws")
+export let client = new PhysicsSimulationClient("anthony", "ws://127.0.0.1:8080/ws", true);
+client.connect();
 
 renderer.start();

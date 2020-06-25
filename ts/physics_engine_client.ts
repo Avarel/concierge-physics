@@ -49,14 +49,24 @@ function vec2f2vector2(vec: Vec2f): Vector2 {
 }
 
 export class PhysicsSimulationClient {
+    readonly url: string;
     readonly name: string;
-    readonly socket: WebSocket;
-    uuid!: ConciergeAPI.Uuid;
-    subscribeInterval: number | undefined;
+    reconnect: boolean;
+    reconnectInterval: number = 5000;
+    private socket!: WebSocket;
+    private uuid!: ConciergeAPI.Uuid;
+    subscribeInterval: number = 5000;
+    subscribeHandle: number | undefined;
 
-    constructor(name: string, url: string) {
+    constructor(name: string, url: string, reconnect: boolean = false) {
+        this.url = url;
         this.name = name;
-        this.socket = new WebSocket(url);
+        this.reconnect = reconnect;
+    }
+
+    connect() {
+        console.info("Trying to connect to ", this.url);
+        this.socket = new WebSocket(this.url);
         this.socket.onopen = event => this.onOpen(event);
         this.socket.onmessage = event => this.onReceive(event);
         this.socket.onerror = event => console.log(event);
@@ -80,12 +90,17 @@ export class PhysicsSimulationClient {
 
     private onClose(event: CloseEvent) {
         console.warn(event.code, event.reason);
-        clearInterval(this.subscribeInterval);
+        clearInterval(this.subscribeHandle);
+        if (this.reconnect) {
+            console.warn("Connection closed, reconnecting in", this.reconnectInterval, "ms")
+            setTimeout(() => {
+                this.connect();
+            }, this.reconnectInterval);
+        }
     }
 
     private onReceive(event: MessageEvent) {
         let payload = JSON.parse(event.data) as ConciergeAPI.Payload<PhysicsPayload>;
-        // console.trace(payload);
         this.processConciergePayload(payload);
     }
 
@@ -100,12 +115,12 @@ export class PhysicsSimulationClient {
         };
 
         subFn();
-        this.subscribeInterval = setInterval(subFn, 5000);
+        this.subscribeHandle = setInterval(subFn, this.subscribeInterval);
     }
 
     private cancelSubscribe() {
-        clearInterval(this.subscribeInterval)
-        this.subscribeInterval = undefined;
+        clearInterval(this.subscribeHandle)
+        this.subscribeHandle = undefined;
     }
 
     private onSubscribe() {
