@@ -21,7 +21,21 @@ renderer.scene = renderer.createScene();
 // ];
 // renderer.createPolygon("wowzers", Vector2.Zero(), corners, 1);
 
-export let client = new PhysicsSimulationClient("anthony", "ws://127.0.0.1:8080/ws", true);
+var url: string | null | undefined;
+
+// ws://compute-cpu2.cms.caltech.edu:64209/ws
+
+while (!url || url.length == 0) {
+    url = prompt("Please enter the server address", "ws://127.0.0.1:64209/ws")
+}
+
+var person: string | null | undefined;
+
+while (!person || person.length == 0) {
+    person = prompt("Please enter your name", "anthony")
+}
+
+export let client = new PhysicsSimulationClient(person, url, true);
 client.connect();
 
 renderer.start();
