@@ -54,32 +54,12 @@ export class Renderer {
             enableGroundShadow: true
         });
         // recenter
-        helper?.ground?.position.set(500, 0, 500);
-        helper?.skybox?.position.set(500, 0, 500);
+        helper!.ground!.position.set(500, 0, 500);
+        helper!.skybox!.position.set(500, 0, 500);
+        helper!.skybox!.isPickable = false;
         helper!.setMainColor(BABYLON.Color3.FromHexString("#74b9ff"));
 
         this.generator = new BABYLON.ShadowGenerator(512, light);
-
-        scene.actionManager = new BABYLON.ActionManager(scene);
-        // scene.actionManager.registerAction(
-        //     new BABYLON.ExecuteCodeAction(
-        //         {
-        //             trigger: BABYLON.ActionManager.OnKeyUpTrigger,
-        //             parameter: 'r'
-        //         },
-        //         function () { console.log('r button was pressed'); }
-        //     )
-        // );
-
-        // Our built-in 'sphere' shape. Params: name, subdivs, size, scene
-        var sphere = BABYLON.Mesh.CreateSphere("sphere1", 16, 20, scene);
-        // Move the sphere upward 1/2 its height
-        sphere.position.y = 1;
-        // Setup pick action
-        sphere.actionManager = new BABYLON.ActionManager(scene);
-        sphere.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, function() {
-            console.log("Got Pick Action");
-        }));
 
         var vrHelper = scene.createDefaultVRExperience({ createDeviceOrientationCamera: false });
         vrHelper.enableTeleportation({ floorMeshes: [helper!.ground!] });
@@ -138,29 +118,25 @@ export class Shape {
         mesh.material = mat;
 
         mesh.actionManager = new BABYLON.ActionManager(scene);
-        mesh.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, function() {
-            console.log("Got Pick Action");
-        }));    
-        // mesh.actionManager.registerAction(
-        //     // new ExecuteCodeAction(
-        //     //     BABYLON.ActionManager.OnPickTrigger,
-        //     //     function() {
-        //     //         console.log("Clicking on object ", id, ".")
-        //     //         client.send({
-        //     //             operation: "MESSAGE",
-        //     //             target: {
-        //     //                 type: "NAME",
-        //     //                 name: PHYSICS_ENGINE_NAME
-        //     //             },
-        //     //             data: {
-        //     //                 type: "TOGGLE_COLOR",
-        //     //                 id: id,
-        //     //             }
-        //     //         })
-        //     //     }
-        //     // )
-        // );
-
+        mesh.actionManager.registerAction(
+            new ExecuteCodeAction(
+                BABYLON.ActionManager.OnPickTrigger,
+                function() {
+                    console.log("Clicking on object ", id, ".")
+                    client.send({
+                        operation: "MESSAGE",
+                        target: {
+                            type: "NAME",
+                            name: PHYSICS_ENGINE_NAME
+                        },
+                        data: {
+                            type: "TOGGLE_COLOR",
+                            id: id,
+                        }
+                    })
+                }
+            )
+        );
 
         return new Shape(centroid, mesh);
     }

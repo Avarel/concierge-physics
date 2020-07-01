@@ -213,6 +213,14 @@ export class PhysicsSimulationClient {
         }
     }
     
+    private updateColor(id: string, color: DeepImmutable<RgbColor>) {
+        let shape = renderer.shapes[id];
+        if (shape) {
+            shape.setColor(tuple2color3(color));
+        } else {
+            console.warn("Shape ", id, " not registered with client")
+        }
+    }
 
     private processPhysicsPayload(payload: DeepImmutable<PhysicsPayload>) {
         switch (payload.type) {
@@ -227,6 +235,9 @@ export class PhysicsSimulationClient {
                 for (let update of payload.updates) {
                     this.updateShape(update.id, update.position);
                 }
+                break;
+            case "COLOR_UPDATE":
+                this.updateColor(payload.id, payload.color);
                 break;
             default:
                 console.log(payload);
