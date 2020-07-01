@@ -9,6 +9,9 @@ module.exports = {
         chunkFilename: '[name].bundle.js',
         path: path.resolve(__dirname, 'dist')
     },
+    externals: {
+        'babylonjs': "BABYLON"
+    },
     resolve: {
         extensions: [".ts"]
     },

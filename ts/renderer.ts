@@ -71,6 +71,16 @@ export class Renderer {
         //     )
         // );
 
+        // Our built-in 'sphere' shape. Params: name, subdivs, size, scene
+        var sphere = BABYLON.Mesh.CreateSphere("sphere1", 16, 20, scene);
+        // Move the sphere upward 1/2 its height
+        sphere.position.y = 1;
+        // Setup pick action
+        sphere.actionManager = new BABYLON.ActionManager(scene);
+        sphere.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, function() {
+            console.log("Got Pick Action");
+        }));
+
         var vrHelper = scene.createDefaultVRExperience({ createDeviceOrientationCamera: false });
         vrHelper.enableTeleportation({ floorMeshes: [helper!.ground!] });
 
