@@ -1,5 +1,5 @@
 import * as ConciergeAPI from "./concierge";
-import { DeepImmutable, Vector2, DeepImmutableArray } from "babylonjs";
+import { DeepImmutable, Vector2, DeepImmutableArray, Color3 } from "babylonjs";
 import { renderer } from ".";
 import { Shape } from "./renderer";
 
@@ -8,10 +8,24 @@ export interface Vec2f {
     y: number
 }
 
+type RgbColor = [number, number, number];
+
 export interface Entity {
     id: string,
     centroid: Vec2f,
-    points: Vec2f[]
+    points: Vec2f[],
+    color: RgbColor
+}
+
+export interface ToggleColor {
+    type: "TOGGLE_COLOR",
+    id: string,
+}
+
+export interface ColorUpdate {
+    type: "COLOR_UPDATE",
+    id: string,
+    color: RgbColor
 }
 
 export interface EntityUpdate {
@@ -37,15 +51,25 @@ export interface PositionDump {
     updates: EntityUpdate[]
 }
 
-type PhysicsPayload = EntityDump | PositionDump | FetchEntities | FetchPositions;
+type PhysicsPayload = EntityDump | PositionDump
+    | FetchEntities | FetchPositions
+    | ColorUpdate | ToggleColor;
 
-const PHYSICS_ENGINE_NAME = "physics_engine";
-const PHYSICS_ENGINE_GROUP = "physics_engine_out";
+export const PHYSICS_ENGINE_NAME = "physics_engine";
+export const PHYSICS_ENGINE_GROUP = "physics_engine_out";
 
 type ConciergePayload = ConciergeAPI.Payload<PhysicsPayload>;
 
 function vec2f2vector2(vec: Vec2f): Vector2 {
     return new Vector2(vec.x, vec.y);
+}
+
+function tuple2color3(tuple: DeepImmutable<RgbColor>): Color3 {
+    function clamp(n: number): number {
+        return Math.max(0, Math.min(n, 255)) / 255
+    }
+
+    return new Color3(clamp(tuple[0]), clamp(tuple[1]), clamp(tuple[2]))
 }
 
 export class PhysicsSimulationClient {
@@ -173,10 +197,11 @@ export class PhysicsSimulationClient {
         }
     }
 
-    private createShape(id: string, centroid: Vec2f, points: DeepImmutableArray<Vec2f>, scale: number = 1) {
+    private createShape(id: string, centroid: Vec2f, points: DeepImmutableArray<Vec2f>, color: DeepImmutable<RgbColor>, scale: number = 1) {
         let centroidv = vec2f2vector2(centroid);
         let pointsv = points.map(vec2f2vector2);
-        renderer.createPolygon(id, centroidv, pointsv, scale);
+        let color3 = tuple2color3(color);
+        renderer.createPolygon(id, centroidv, pointsv, color3, scale);
     }
 
     private updateShape(id: string, centroid: Vec2f) {
@@ -187,6 +212,7 @@ export class PhysicsSimulationClient {
             console.warn("Shape ", id, " not registered with client")
         }
     }
+    
 
     private processPhysicsPayload(payload: DeepImmutable<PhysicsPayload>) {
         switch (payload.type) {
@@ -194,7 +220,7 @@ export class PhysicsSimulationClient {
                 console.log("Dumping entities!");
                 renderer.clearShapes();
                 for (let entity of payload.entities) {
-                    this.createShape(entity.id, entity.centroid, entity.points);
+                    this.createShape(entity.id, entity.centroid, entity.points, entity.color);
                 }
                 break;
             case "POSITION_DUMP":

@@ -1,11 +1,14 @@
-import { Engine, Scene, Vector2, Vector3, UniversalCamera, Mesh, DeepImmutableObject } from "babylonjs";
+import { Engine, Scene, Vector2, Vector3, UniversalCamera, Mesh, DeepImmutableObject, ShadowGenerator, Color3, StandardMaterial, ExecuteCodeAction } from "babylonjs";
 import * as BABYLON from 'babylonjs';
+import { client } from ".";
+import { PHYSICS_ENGINE_NAME } from "./physics_engine_client";
 
 export class Renderer {
     canvas: HTMLCanvasElement;
     shapes: { [_ in string]?: Shape };
     engine: Engine;
     scene?: Scene;
+    generator?: ShadowGenerator;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -16,17 +19,23 @@ export class Renderer {
     clearShapes() {
         for (let key in this.shapes) {
             if (this.shapes.hasOwnProperty(key)) {
-                this.shapes[key]!.mesh.dispose();
+                let shape = this.shapes[key]!;
+                this.generator?.removeShadowCaster(shape.mesh);
+                shape.mesh.dispose();
                 delete this.shapes[key];
             }
         }
     }
 
     createScene(): Scene {
+        if (this.scene) {
+            this.scene.dispose();
+        }
+
         let scene = new Scene(this.engine);
-        let camera = new UniversalCamera("UniversalCamera", new Vector3(500, 250, -250), scene);
+        let camera = new UniversalCamera("UniversalCamera", new Vector3(500, 800, -100), scene);
         camera.setTarget(new Vector3(500, 0, 500));
-        camera.speed = 5;
+        camera.speed = 15;
         camera.attachControl(this.canvas, true);
         camera.keysDownward.push(17); //CTRL
         camera.keysUpward.push(32); //SPACE
@@ -35,15 +44,44 @@ export class Renderer {
         camera.keysLeft.push(65);  //A
         camera.keysRight.push(68); //S
 
-        let light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 10, 0), scene);
-        light.intensity = 0.5;
+        let light = new BABYLON.PointLight("light1", new BABYLON.Vector3(500, 500, 500), scene);
+        light.intensity = 1.0;
+
+        let helper = scene.createDefaultEnvironment({
+            skyboxSize: 1050,
+            groundSize: 1050,
+            groundShadowLevel: 0.5,
+            enableGroundShadow: true
+        });
+        // recenter
+        helper?.ground?.position.set(500, 0, 500);
+        helper?.skybox?.position.set(500, 0, 500);
+        helper!.setMainColor(BABYLON.Color3.FromHexString("#74b9ff"));
+
+        this.generator = new BABYLON.ShadowGenerator(512, light);
+
+        scene.actionManager = new BABYLON.ActionManager(scene);
+        // scene.actionManager.registerAction(
+        //     new BABYLON.ExecuteCodeAction(
+        //         {
+        //             trigger: BABYLON.ActionManager.OnKeyUpTrigger,
+        //             parameter: 'r'
+        //         },
+        //         function () { console.log('r button was pressed'); }
+        //     )
+        // );
+
+        var vrHelper = scene.createDefaultVRExperience({ createDeviceOrientationCamera: false });
+        vrHelper.enableTeleportation({ floorMeshes: [helper!.ground!] });
 
         return scene;
     }
 
-    createPolygon(id: string, centroid: Vector2, points: Vector2[], scale: number = 1) {
+    createPolygon(id: string, centroid: Vector2, points: Vector2[], color: Color3, scale: number = 1) {
         if (this.scene) {
-            this.shapes[id] = Shape.createPolygon(centroid, points, this.scene, scale);
+            let shape = Shape.createPolygon(id, centroid, points, this.scene, color, scale);
+            this.shapes[id] = shape;
+            this.generator?.addShadowCaster(shape.mesh);
         }
     }
 
@@ -60,6 +98,9 @@ export class Renderer {
             }
         };
         this.engine.runRenderLoop(renderFunc);
+        window.addEventListener("resize", () => {
+            this.engine.resize();
+        });
     }
 
     stop() {
@@ -76,11 +117,46 @@ export class Shape {
         this.mesh = mesh;
     }
 
-    static createPolygon(centroid: Vector2, points: Vector2[], scene: Scene, scale: number = 1): Shape {
+    static createPolygon(id: string, centroid: Vector2, points: Vector2[], scene: Scene, color: Color3, scale: number = 1): Shape {
         let corners = points.map((v) => v.scale(scale));
         let poly_tri = new BABYLON.PolygonMeshBuilder("polytri", corners, scene);
         let mesh = poly_tri.build(undefined, 50);
+        mesh.position.y += 50;
+
+        var mat = new BABYLON.StandardMaterial("myMaterial", scene);
+        mat.diffuseColor = color;
+        mesh.material = mat;
+
+        mesh.actionManager = new BABYLON.ActionManager(scene);
+        mesh.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, function() {
+            console.log("Got Pick Action");
+        }));    
+        // mesh.actionManager.registerAction(
+        //     // new ExecuteCodeAction(
+        //     //     BABYLON.ActionManager.OnPickTrigger,
+        //     //     function() {
+        //     //         console.log("Clicking on object ", id, ".")
+        //     //         client.send({
+        //     //             operation: "MESSAGE",
+        //     //             target: {
+        //     //                 type: "NAME",
+        //     //                 name: PHYSICS_ENGINE_NAME
+        //     //             },
+        //     //             data: {
+        //     //                 type: "TOGGLE_COLOR",
+        //     //                 id: id,
+        //     //             }
+        //     //         })
+        //     //     }
+        //     // )
+        // );
+
+
         return new Shape(centroid, mesh);
+    }
+
+    setColor(color: DeepImmutableObject<Color3>) {
+        (this.mesh.material! as StandardMaterial).diffuseColor! = color;
     }
 
     moveTo(point: DeepImmutableObject<Vector2>) {
