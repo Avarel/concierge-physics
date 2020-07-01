@@ -9,8 +9,12 @@ canvas.focus();
 
 var url = prompt("Please enter the server address", "ws://127.0.0.1:64209/ws")
 
-// ws://compute-cpu2.cms.caltech.edu:64209/ws
-// wss://compute-cpu2.cms.caltech.edu:64209/ws
+if (url == "debug") {
+    let renderer = new Renderer(canvas);
+    renderer.scene = renderer.createScene();
+    renderer.start();
+    throw "Debug mode"
+}
 
 if (!url || url.length == 0) {
     throw alert("A server address is required, please restart the webpage.")  
