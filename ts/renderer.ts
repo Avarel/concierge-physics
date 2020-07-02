@@ -1,7 +1,7 @@
 import { Engine, Scene, Vector2, Vector3, UniversalCamera, Mesh, DeepImmutableObject, ShadowGenerator, Color3, StandardMaterial, ExecuteCodeAction } from "babylonjs";
 import * as BABYLON from 'babylonjs';
 import { client } from ".";
-import { PHYSICS_ENGINE_NAME } from "./physics_engine_client";
+import { PHYSICS_ENGINE_NAME } from "./physics_handler";
 
 export class Renderer {
     canvas: HTMLCanvasElement;
@@ -121,7 +121,7 @@ export class Shape {
         mesh.actionManager.registerAction(
             new ExecuteCodeAction(
                 BABYLON.ActionManager.OnPickTrigger,
-                function() {
+                () => {
                     console.log("Clicking on object ", id, ".")
                     client.sendJSON({
                         operation: "MESSAGE",

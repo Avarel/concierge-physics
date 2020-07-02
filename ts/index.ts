@@ -1,6 +1,6 @@
 import { Renderer } from "./renderer";
 import * as ConciergeAPI from "./concierge_api";
-import { PhysicsSimulationHandler } from "./physics_engine_client";
+import { PhysicsHandler } from "./physics_handler";
 
 let canvas = document.querySelector<HTMLCanvasElement>("#renderCanvas");
 if (!canvas) {
@@ -18,19 +18,19 @@ if (url == "debug") {
 }
 
 if (!url || url.length == 0) {
-    throw alert("A server address is required, please restart the webpage.")  
+    throw alert("A server address is required, please restart the webpage.")
 }
 
 var person = prompt("Please enter your name", "anthony");
 if (!person || person.length == 0) {
-    throw alert("A valid name, please restart the webpage.")  
+    throw alert("A valid name, please restart the webpage.")
 }
 
 export let renderer = new Renderer(canvas);
 renderer.scene = renderer.createScene();
 
 export let client = new ConciergeAPI.Client(person, url, true);
-let handler = new PhysicsSimulationHandler();
+let handler = new PhysicsHandler();
 client.handlers.push(handler);
 client.connect();
 

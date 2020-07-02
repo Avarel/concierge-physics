@@ -23,10 +23,6 @@ export type DeepImmutableObject<T> = {
 
 interface DeepImmutableArray<T> extends ReadonlyArray<DeepImmutable<T>> { }
 
-function assertUuid(uuid: string): Uuid {
-    return uuid as Uuid
-}
-
 export enum StatusCode {
     OK = 2000,
     MESSAGE_SENT = 2001,

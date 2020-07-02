@@ -72,7 +72,7 @@ function tuple2color3(tuple: DeepImmutable<RgbColor>): Color3 {
     return new Color3(clamp(tuple[0]), clamp(tuple[1]), clamp(tuple[2]))
 }
 
-export class PhysicsSimulationHandler extends ConciergeAPI.EventHandler {
+export class PhysicsHandler extends ConciergeAPI.EventHandler {
     subscribeInterval: number = 5000;
     subscribeHandle: number | undefined;
 
@@ -158,7 +158,7 @@ export class PhysicsSimulationHandler extends ConciergeAPI.EventHandler {
             console.warn("Shape ", id, " not registered with client")
         }
     }
-    
+
     private updateColor(id: string, color: DeepImmutable<RgbColor>) {
         let shape = renderer.shapes[id];
         if (shape) {
