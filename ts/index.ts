@@ -1,6 +1,5 @@
 import { Renderer } from "./renderer";
 import * as ConciergeAPI from "./concierge_api";
-// import { PhysicsSimulationClient } from "./physics_engine_client"
 import { PhysicsSimulationHandler } from "./physics_engine_client";
 
 let canvas = document.querySelector<HTMLCanvasElement>("#renderCanvas");
@@ -29,9 +28,6 @@ if (!person || person.length == 0) {
 
 export let renderer = new Renderer(canvas);
 renderer.scene = renderer.createScene();
-
-// export let client = new PhysicsSimulationClient(person, url, true);
-// client.connect();
 
 export let client = new ConciergeAPI.Client(person, url, true);
 let handler = new PhysicsSimulationHandler();
