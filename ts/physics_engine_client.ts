@@ -139,7 +139,7 @@ export class PhysicsSimulationClient {
         };
 
         subFn();
-        this.subscribeHandle = setInterval(subFn, this.subscribeInterval);
+        this.subscribeHandle = window.setInterval(subFn, this.subscribeInterval);
     }
 
     private cancelSubscribe() {
