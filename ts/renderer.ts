@@ -123,7 +123,7 @@ export class Shape {
                 BABYLON.ActionManager.OnPickTrigger,
                 function() {
                     console.log("Clicking on object ", id, ".")
-                    client.send({
+                    client.sendJSON({
                         operation: "MESSAGE",
                         target: {
                             type: "NAME",

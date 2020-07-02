@@ -166,14 +166,14 @@ export type Payload<M> = Identify | Message<M> | Subscribe | Unsubscribe
     | FetchGroupList | FetchSubs | Hello | GroupSubs | GroupList
     | ClientList | Subs | ClientJoin | ClientLeave | Status<any>;
 
-export class ConciergeClient {
+export class Client {
     readonly url: string;
     readonly name: string;
     reconnect: boolean;
     reconnectInterval: number = 5000;
     private socket!: WebSocket;
-    private uuid!: Uuid;
-    handlers: ConciergeRawHandler[] = [];
+    uuid!: Uuid;
+    handlers: RawHandler[] = [];
 
     constructor(name: string, url: string, reconnect: boolean = false) {
         this.url = url;
@@ -190,7 +190,7 @@ export class ConciergeClient {
         this.socket.onclose = event => this.onClose(event);
     }
 
-    send(payload: Payload<any>) {
+    sendJSON(payload: Payload<any>) {
         this.socket.send(JSON.stringify(payload));
     }
 
@@ -206,9 +206,9 @@ export class ConciergeClient {
 
     private onOpen(event: Event) {
         for (let handler of this.handlers) {
-            handler.onOpen?.(event);
+            handler.onOpen?.(this, event);
         }
-        this.send({
+        this.sendJSON({
             operation: "IDENTIFY",
             name: this.name
         });
@@ -216,7 +216,7 @@ export class ConciergeClient {
 
     private onClose(event: CloseEvent) {
         for (let handler of this.handlers) {
-            handler.onClose?.(event);
+            handler.onClose?.(this, event);
         }
         console.warn(event.code, event.reason);
     }
@@ -225,67 +225,72 @@ export class ConciergeClient {
         let data = JSON.parse(event.data) as object;
         if (data.hasOwnProperty("operation")) {
             let payload = data as Payload<any>;
+
+            if (payload.operation == "HELLO") {
+                this.uuid = payload.uuid;
+            }
+
             for (let handler of this.handlers) {
-                handler.onReceive?.(payload);
+                handler.onReceive?.(this, payload);
             }
         }
     }
 
     private onError(event: Event) {
         for (let handler of this.handlers) {
-            handler.onError?.(event);
+            handler.onError?.(this, event);
         }
         console.log(event);
     }
 }
 
-export interface ConciergeRawHandler {
-    onOpen?(event: Event): void;
-    onClose?(event: CloseEvent): void;
-    onReceive?(payload: Payload<any>): void;
-    onError?(event: Event): void;
+export interface RawHandler {
+    onOpen?(client: Client, event: Event): void;
+    onClose?(client: Client, event: CloseEvent): void;
+    onReceive?(client: Client, payload: Payload<any>): void;
+    onError?(client: Client, event: Event): void;
 }
 
-export abstract class ConciergeEventHandler implements ConciergeRawHandler {
-    onReceive(payload: Payload<any>): void {
+export abstract class EventHandler implements RawHandler {
+    onReceive(client: Client, payload: Payload<any>): void {
         switch (payload.operation) {
             case "MESSAGE":
-                this.onRecvMessage?.(payload);
+                this.onRecvMessage?.(client, payload);
                 break;
             case "HELLO":
-                this.onRecvHello?.(payload);
+                this.onRecvHello?.(client, payload);
                 break;
             case "GROUP_SUBS":
-                this.onRecvGroupSubs?.(payload);
+                this.onRecvGroupSubs?.(client, payload);
                 break;
             case "GROUP_LIST":
-                this.onRecvGroupList?.(payload);
+                this.onRecvGroupList?.(client, payload);
                 break;
             case "CLIENT_LIST":
-                this.onRecvClientList?.(payload);
+                this.onRecvClientList?.(client, payload);
                 break;
             case "SUBS":
-                this.onRecvSubs?.(payload);
+                this.onRecvSubs?.(client, payload);
                 break;
             case "CLIENT_JOIN":
-                this.onRecvClientJoin?.(payload);
+                this.onRecvClientJoin?.(client, payload);
                 break;
             case "CLIENT_LEAVE":
-                this.onRecvClientLeave?.(payload);
+                this.onRecvClientLeave?.(client, payload);
                 break;
             case "STATUS":
-                this.onRecvStatus?.(payload);
+                this.onRecvStatus?.(client, payload);
                 break;
         }
     }
 
-    onRecvMessage?(message: Message<any>): void;
-    onRecvHello?(hello: Hello): void;
-    onRecvGroupSubs?(groupSubs: GroupSubs): void;
-    onRecvGroupList?(groupList: GroupList): void;
-    onRecvClientList?(clientList: ClientList): void;
-    onRecvSubs?(subs: Subs): void;
-    onRecvClientJoin?(clientJoin: ClientJoin): void;
-    onRecvClientLeave?(clientLeave: ClientLeave): void;
-    onRecvStatus?(status: Status<any>): void;
+    onRecvMessage?(client: Client, message: Message<any>): void;
+    onRecvHello?(client: Client, hello: Hello): void;
+    onRecvGroupSubs?(client: Client, groupSubs: GroupSubs): void;
+    onRecvGroupList?(client: Client, groupList: GroupList): void;
+    onRecvClientList?(client: Client, clientList: ClientList): void;
+    onRecvSubs?(client: Client, subs: Subs): void;
+    onRecvClientJoin?(client: Client, clientJoin: ClientJoin): void;
+    onRecvClientLeave?(client: Client, clientLeave: ClientLeave): void;
+    onRecvStatus?(client: Client, status: Status<any>): void;
 }
