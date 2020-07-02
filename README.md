@@ -1,8 +1,7 @@
 # Concierge Physics
 
 ## Building and Running
-First, use Webpack to consolidate the index file into a bundle.
-```
-npm run build
-```
-Then, simply launch the `./index.html` file.
+* Install NPM version `6.14.5` or above.
+* Install dependencies with `npm install`.
+* Execute `npm run build` to build `index.bundle.js` from `ts/` files.
+* Launch or serve the `./index.html` file.
