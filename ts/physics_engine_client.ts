@@ -1,4 +1,4 @@
-import * as ConciergeAPI from "./concierge";
+import * as ConciergeAPI from "./concierge_api";
 import { DeepImmutable, Vector2, DeepImmutableArray, Color3 } from "babylonjs";
 import { renderer } from ".";
 import { Shape } from "./renderer";
