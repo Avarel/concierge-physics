@@ -62,112 +62,99 @@ export interface TargetGroup {
 
 export type Target = TargetName | TargetUuid | TargetGroup;
 
-export interface Identify {
-    operation: "IDENTIFY",
-    name: string,
+export interface BasePayload<T> {
+    type: T
 }
 
-export interface Message<T> {
-    operation: "MESSAGE",
+export interface Identify extends BasePayload<"IDENTIFY"> {
+    name: string,
+    version: string,
+    secret?: string
+}
+
+export interface Message<T> extends BasePayload<"MESSAGE"> {
     target: Target,
     origin?: Origin,
     data: T
 }
 
-export interface Subscribe {
-    operation: "SUBSCRIBE",
+export interface Subscribe extends BasePayload<"SUBSCRIBE"> {
     group: string
 }
 
-export interface Unsubscribe {
-    operation: "UNSUBSCRIBE",
+export interface Unsubscribe extends BasePayload<"UNSUBSCRIBE"> {
     group: string
 }
 
-export interface Broadcast {
-    operation: "BROADCAST",
+export interface Broadcast extends BasePayload<"BROADCAST"> {
     origin?: Origin,
     data: object
 }
 
-export interface CreateGroup {
-    operation: "CREATE_GROUP",
+export interface CreateGroup extends BasePayload<"CREATE_GROUP"> {
     group: string
 }
 
-export interface DeleteGroup {
-    operation: "DELETE_GROUP",
+export interface DeleteGroup extends BasePayload<"DELETE_GROUP"> {
     group: string
 }
 
-export interface FetchGroupSubs {
-    operation: "FETCH_GROUP_SUBS",
+export interface FetchGroupSubs extends BasePayload<"FETCH_GROUP_SUB_LIST"> {
     group: string
 }
 
-export interface FetchGroupList {
-    operation: "FETCH_GROUP_LIST"
-}
+export interface FetchGroupList extends BasePayload<"FETCH_GROUP_LIST"> { }
 
-export interface FetchClientList {
-    operation: "FETCH_CLIENT_LIST"
-}
+export interface FetchClientList extends BasePayload<"FETCH_CLIENT_LIST"> { }
 
-export interface FetchSubs {
-    operation: "FETCH_SUBS"
-}
+export interface FetchSubList extends BasePayload<"FETCH_SUB_LIST"> { }
 
-export interface Hello {
-    operation: "HELLO",
+export interface Hello extends BasePayload<"HELLO"> {
     uuid: Uuid,
+    version: string
 }
 
-export interface GroupSubs {
-    operation: "GROUP_SUBS",
+export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST"> {
     group: string,
     clients: Origin[]
 }
 
-export interface GroupList {
-    operation: "GROUP_LIST",
+export interface GroupList extends BasePayload<"GROUP_LIST"> {
     groups: string[]
 }
 
-export interface ClientList {
-    operation: "CLIENT_LIST",
+export interface ClientList extends BasePayload<"CLIENT_LIST"> {
     clients: Origin[]
 }
 
-export interface Subs {
-    operation: "SUBS",
+export interface Subs extends BasePayload<"SUB_LIST"> {
     groups: string[],
 }
 
-export type ClientJoin = {
-    operation: "CLIENT_JOIN"
-} & Origin;
+export interface ClientJoin extends BasePayload<"CLIENT_JOIN">, Origin { }
 
-export type ClientLeave = {
-    operation: "CLIENT_LEAVE"
-} & Origin;
+export interface ClientLeave extends BasePayload<"CLIENT_LEAVE">, Origin { }
 
-export interface Status<T> {
-    operation: "STATUS",
+export interface Status<T> extends BasePayload<"STATUS"> {
     code: StatusCode,
     data: T
 }
 
 export type Payload<M> = Identify | Message<M> | Subscribe | Unsubscribe
     | Broadcast | CreateGroup | DeleteGroup | FetchGroupSubs
-    | FetchGroupList | FetchSubs | Hello | GroupSubs | GroupList
+    | FetchGroupList | FetchSubList | Hello | GroupSubs | GroupList
     | ClientList | Subs | ClientJoin | ClientLeave | Status<any>;
 
 export class Client {
     readonly url: string;
     readonly name: string;
+
+    private socket?: WebSocket;
+    private version?: string;
+    private secret?: string;
+
     reconnect: boolean;
-    reconnectInterval: number = 5000;
-    private socket!: WebSocket;
+    reconnectInterval: number = 10000;
     uuid!: Uuid;
     handlers: RawHandler[] = [];
 
@@ -177,8 +164,10 @@ export class Client {
         this.reconnect = reconnect;
     }
 
-    connect() {
+    connect(version: string, secret?: string) {
         console.info("Trying to connect to ", this.url);
+        this.version = version;
+        this.secret = secret;
         this.socket = new WebSocket(this.url);
         this.socket.onopen = event => this.onOpen(event);
         this.socket.onmessage = event => this.onReceive(event);
@@ -187,15 +176,31 @@ export class Client {
     }
 
     sendJSON(payload: Payload<any>) {
+        if (this.socket == undefined) {
+            throw new Error("Socket is not connected")
+        }
         this.socket.send(JSON.stringify(payload));
     }
 
     close(code?: number, reason?: string, reconnect: boolean = true) {
+        if (this.socket == undefined) {
+            throw new Error("Socket is not connected")
+        }
         this.socket.close(code, reason);
-        if (reconnect && this.reconnect) {
+        if (reconnect) {
+            this.tryReconnect();
+        } else {
+            this.socket = undefined;
+            this.version = undefined;
+            this.secret = undefined;
+        }
+    }
+
+    private tryReconnect() {
+        if (this.reconnect) {
             console.warn("Connection closed, reconnecting in", this.reconnectInterval, "ms")
             setTimeout(() => {
-                this.connect();
+                this.connect(this.version!, this.secret);
             }, this.reconnectInterval);
         }
     }
@@ -204,9 +209,15 @@ export class Client {
         for (let handler of this.handlers) {
             handler.onOpen?.(this, event);
         }
+        if (this.version == undefined) {
+            throw new Error("Version is undefined")
+        }
+        console.log("Identifying with version", this.version);
         this.sendJSON({
-            operation: "IDENTIFY",
-            name: this.name
+            type: "IDENTIFY",
+            name: this.name,
+            version: this.version,
+            secret: this.secret
         });
     }
 
@@ -215,14 +226,15 @@ export class Client {
             handler.onClose?.(this, event);
         }
         console.warn(event.code, event.reason);
+        this.tryReconnect();
     }
 
     private onReceive(event: MessageEvent) {
         let data = JSON.parse(event.data) as object;
-        if (data.hasOwnProperty("operation")) {
+        if (data.hasOwnProperty("type")) {
             let payload = data as Payload<any>;
 
-            if (payload.operation == "HELLO") {
+            if (payload.type == "HELLO") {
                 this.uuid = payload.uuid;
             }
 
@@ -249,14 +261,14 @@ export interface RawHandler {
 
 export abstract class EventHandler implements RawHandler {
     onReceive(client: Client, payload: Payload<any>): void {
-        switch (payload.operation) {
+        switch (payload.type) {
             case "MESSAGE":
                 this.onRecvMessage?.(client, payload);
                 break;
             case "HELLO":
                 this.onRecvHello?.(client, payload);
                 break;
-            case "GROUP_SUBS":
+            case "GROUP_SUB_LIST":
                 this.onRecvGroupSubs?.(client, payload);
                 break;
             case "GROUP_LIST":
@@ -265,7 +277,7 @@ export abstract class EventHandler implements RawHandler {
             case "CLIENT_LIST":
                 this.onRecvClientList?.(client, payload);
                 break;
-            case "SUBS":
+            case "SUB_LIST":
                 this.onRecvSubs?.(client, payload);
                 break;
             case "CLIENT_JOIN":

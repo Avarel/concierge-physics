@@ -32,7 +32,7 @@ renderer.scene = renderer.createScene();
 export let client = new ConciergeAPI.Client(person, url, true);
 let handler = new PhysicsHandler();
 client.handlers.push(handler);
-client.connect();
+client.connect("0.1.0");
 
 renderer.start();
 

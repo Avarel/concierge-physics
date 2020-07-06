@@ -114,7 +114,7 @@ export class PhysicsHandler extends ConciergeAPI.EventHandler {
         let subFn = () => {
             console.log("Attempting to subscribe to ", PHYSICS_ENGINE_GROUP);
             client.sendJSON({
-                operation: "SUBSCRIBE",
+                type: "SUBSCRIBE",
                 group: PHYSICS_ENGINE_GROUP
             });
         };
@@ -126,7 +126,7 @@ export class PhysicsHandler extends ConciergeAPI.EventHandler {
     private onSubscribe(client: ConciergeAPI.Client) {
         console.log("Subscribed!");
         client.sendJSON({
-            operation: "MESSAGE",
+            type: "MESSAGE",
             target: {
                 type: "NAME",
                 name: PHYSICS_ENGINE_NAME

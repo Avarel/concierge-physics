@@ -124,7 +124,7 @@ export class Shape {
                 () => {
                     console.log("Clicking on object ", id, ".")
                     client.sendJSON({
-                        operation: "MESSAGE",
+                        type: "MESSAGE",
                         target: {
                             type: "NAME",
                             name: PHYSICS_ENGINE_NAME
