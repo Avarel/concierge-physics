@@ -26,12 +26,12 @@ if (!person || person.length == 0) {
     throw alert("A valid name, please restart the webpage.")
 }
 
-export let renderer = new Renderer(canvas);
+let renderer = new Renderer(canvas);
 renderer.scene = renderer.createScene();
 
-export let client = new ConciergeAPI.Client(person, url, true);
-let handler = new PhysicsHandler();
-client.handlers.push(handler);
+let client = new ConciergeAPI.Client(person, url, true);
+let physicsHandler = new PhysicsHandler(client, renderer);
+client.handlers.push(physicsHandler);
 client.connect("0.1.0");
 
 renderer.start();

@@ -43,26 +43,26 @@ export enum StatusCode {
 export interface Origin {
     name: string,
     uuid: Uuid,
+    group?: string,
 }
 
-export interface TargetName {
-    type: "NAME",
+export interface BaseTarget<T extends string> {
+    type: T
+}
+export interface TargetName extends BaseTarget<"NAME"> {
     name: string
 }
-
-export interface TargetUuid {
-    type: "UUID",
+export interface TargetUuid extends BaseTarget<"UUID"> {
     uuid: Uuid,
 }
-
-export interface TargetGroup {
-    type: "GROUP",
+export interface TargetGroup extends BaseTarget<"GROUP"> {
     group: string
 }
+export interface TargetAll extends BaseTarget<"ALL"> { }
 
-export type Target = TargetName | TargetUuid | TargetGroup;
+export type Target = TargetName | TargetUuid | TargetGroup | TargetAll;
 
-export interface BasePayload<T> {
+export interface BasePayload<T extends string> {
     type: T
 }
 
@@ -71,80 +71,61 @@ export interface Identify extends BasePayload<"IDENTIFY"> {
     version: string,
     secret?: string
 }
-
 export interface Message<T> extends BasePayload<"MESSAGE"> {
     target: Target,
     origin?: Origin,
     data: T
 }
-
 export interface Subscribe extends BasePayload<"SUBSCRIBE"> {
     group: string
 }
-
 export interface Unsubscribe extends BasePayload<"UNSUBSCRIBE"> {
     group: string
 }
-
-export interface Broadcast extends BasePayload<"BROADCAST"> {
-    origin?: Origin,
-    data: object
-}
-
 export interface CreateGroup extends BasePayload<"CREATE_GROUP"> {
     group: string
 }
-
 export interface DeleteGroup extends BasePayload<"DELETE_GROUP"> {
     group: string
 }
-
 export interface FetchGroupSubs extends BasePayload<"FETCH_GROUP_SUB_LIST"> {
     group: string
 }
-
 export interface FetchGroupList extends BasePayload<"FETCH_GROUP_LIST"> { }
-
 export interface FetchClientList extends BasePayload<"FETCH_CLIENT_LIST"> { }
-
 export interface FetchSubList extends BasePayload<"FETCH_SUB_LIST"> { }
-
 export interface Hello extends BasePayload<"HELLO"> {
     uuid: Uuid,
     version: string
 }
-
 export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST"> {
     group: string,
     clients: Origin[]
 }
-
 export interface GroupList extends BasePayload<"GROUP_LIST"> {
     groups: string[]
 }
-
 export interface ClientList extends BasePayload<"CLIENT_LIST"> {
     clients: Origin[]
 }
-
-export interface Subs extends BasePayload<"SUB_LIST"> {
+export interface SubList extends BasePayload<"SUB_LIST"> {
     groups: string[],
 }
-
 export interface ClientJoin extends BasePayload<"CLIENT_JOIN">, Origin { }
-
 export interface ClientLeave extends BasePayload<"CLIENT_LEAVE">, Origin { }
-
 export interface Status<T> extends BasePayload<"STATUS"> {
     code: StatusCode,
     data: T
 }
 
 export type Payload<M> = Identify | Message<M> | Subscribe | Unsubscribe
-    | Broadcast | CreateGroup | DeleteGroup | FetchGroupSubs
+    | CreateGroup | DeleteGroup | FetchGroupSubs
     | FetchGroupList | FetchSubList | Hello | GroupSubs | GroupList
-    | ClientList | Subs | ClientJoin | ClientLeave | Status<any>;
+    | ClientList | SubList | ClientJoin | ClientLeave | Status<any>;
 
+/**
+ * Central connector to the concierge.
+ */
 export class Client {
     readonly url: string;
     readonly name: string;
@@ -207,7 +188,7 @@ export class Client {
 
     private onOpen(event: Event) {
         for (let handler of this.handlers) {
-            handler.onOpen?.(this, event);
+            handler.onOpen?.(event);
         }
         if (this.version == undefined) {
             throw new Error("Version is undefined")
@@ -223,7 +204,7 @@ export class Client {
 
     private onClose(event: CloseEvent) {
         for (let handler of this.handlers) {
-            handler.onClose?.(this, event);
+            handler.onClose?.(event);
         }
         console.warn(event.code, event.reason);
         this.tryReconnect();
@@ -239,66 +220,149 @@ export class Client {
             }
 
             for (let handler of this.handlers) {
-                handler.onReceive?.(this, payload);
+                handler.onReceive?.(payload);
             }
         }
     }
 
     private onError(event: Event) {
         for (let handler of this.handlers) {
-            handler.onError?.(this, event);
+            handler.onError?.(event);
         }
         console.log(event);
     }
 }
 
+/**
+ * Low level handler for the concierge client. Events from JS sockets are passed
+ * directly to this handler.
+ */
 export interface RawHandler {
-    onOpen?(client: Client, event: Event): void;
-    onClose?(client: Client, event: CloseEvent): void;
-    onReceive?(client: Client, payload: Payload<any>): void;
-    onError?(client: Client, event: Event): void;
+    onOpen?(event: Event): void;
+    onClose?(event: CloseEvent): void;
+    onReceive?(payload: Payload<any>): void;
+    onError?(event: Event): void;
 }
 
+/**
+ * Class that allows for high level interaction with incoming payloads.
+ */
 export abstract class EventHandler implements RawHandler {
-    onReceive(client: Client, payload: Payload<any>): void {
+    onReceive(payload: Payload<any>): void {
         switch (payload.type) {
             case "MESSAGE":
-                this.onRecvMessage?.(client, payload);
+                this.onRecvMessage?.(payload);
                 break;
             case "HELLO":
-                this.onRecvHello?.(client, payload);
+                this.onRecvHello?.(payload);
                 break;
             case "GROUP_SUB_LIST":
-                this.onRecvGroupSubs?.(client, payload);
+                this.onRecvGroupSubs?.(payload);
                 break;
             case "GROUP_LIST":
-                this.onRecvGroupList?.(client, payload);
+                this.onRecvGroupList?.(payload);
                 break;
             case "CLIENT_LIST":
-                this.onRecvClientList?.(client, payload);
+                this.onRecvClientList?.(payload);
                 break;
             case "SUB_LIST":
-                this.onRecvSubs?.(client, payload);
+                this.onRecvSubs?.(payload);
                 break;
             case "CLIENT_JOIN":
-                this.onRecvClientJoin?.(client, payload);
+                this.onRecvClientJoin?.(payload);
                 break;
             case "CLIENT_LEAVE":
-                this.onRecvClientLeave?.(client, payload);
+                this.onRecvClientLeave?.(payload);
                 break;
             case "STATUS":
-                this.onRecvStatus?.(client, payload);
+                this.onRecvStatus?.(payload);
                 break;
         }
     }
 
-    onRecvMessage?(client: Client, message: Message<any>): void;
-    onRecvHello?(client: Client, hello: Hello): void;
-    onRecvGroupSubs?(client: Client, groupSubs: GroupSubs): void;
-    onRecvGroupList?(client: Client, groupList: GroupList): void;
-    onRecvClientList?(client: Client, clientList: ClientList): void;
-    onRecvSubs?(client: Client, subs: Subs): void;
-    onRecvClientJoin?(client: Client, clientJoin: ClientJoin): void;
-    onRecvClientLeave?(client: Client, clientLeave: ClientLeave): void;
-    onRecvStatus?(client: Client, status: Status<any>): void;
+    onRecvMessage?(message: Message<any>): void;
+    onRecvHello?(hello: Hello): void;
+    onRecvGroupSubs?(groupSubs: GroupSubs): void;
+    onRecvGroupList?(groupList: GroupList): void;
+    onRecvClientList?(clientList: ClientList): void;
+    onRecvSubs?(subs: SubList): void;
+    onRecvClientJoin?(clientJoin: ClientJoin): void;
+    onRecvClientLeave?(clientLeave: ClientLeave): void;
+    onRecvStatus?(status: Status<any>): void;
+}
+
+/**
+ * Utility class that automatically handles subscription to a specific group.
+ */
+export abstract class ServiceEventHandler extends EventHandler {
+    readonly client: Client;
+    protected subscribeInterval: number = 5000;
+    protected subscribeHandle: number | undefined;
+    protected group: string;
+
+    constructor(client: Client, group: string) {
+        super();
+        this.client = client;
+        this.group = group;
+    }
+
+    /**
+     * Try to regularly subscribe to a group until it succeeds.
+     */
+    trySubscribe() {
+        // try to subscribe until good ("STATUS" handle)
+        let subFn = () => {
+            console.log("Attempting to subscribe to ", this.group);
+            this.client.sendJSON({
+                type: "SUBSCRIBE",
+                group: this.group
+            });
+        };
+
+        subFn();
+        this.subscribeHandle = window.setInterval(subFn, this.subscribeInterval);
+    }
+
+    /**
+     * Called when the handler successfully subscribes to the group.
+     */
+    abstract onSubscribe(): void;
+
+    /**
+     * Called when the handler is unsubscribed from the group.
+     */
+    abstract onUnsubscribe(): void;
+
+    /**
+     * Cancels the process that tries to continuously subscribes to a group.
+     * This cancellation happens automatically when the handler successfully
+     * subscribes.
+     */
+    cancelSubscribe() {
+        clearInterval(this.subscribeHandle)
+        this.subscribeHandle = undefined;
+    }
+
+    onRecvStatus(status: Status<any>): void {
+        switch (status.code) {
+            case StatusCode.NO_SUCH_GROUP:
+                if (status.data == this.group) {
+                    console.error("Group `", this.group, "`does not exist on concierge, is the simulation server on?")
+                }
+                break;
+            case StatusCode.SUBSCRIBED:
+                // subscription complete, stop trying to join
+                if (status.data == this.group) {
+                    this.cancelSubscribe();
+                    this.onSubscribe();
+                }
+                break;
+            case StatusCode.UNSUBSCRIBED:
+                if (status.data == this.group) {
+                    this.trySubscribe();
+                    this.onUnsubscribe();
+                }
+                break;
+        }
+    }
 }

@@ -1,28 +1,27 @@
 import { Engine, Scene, Vector2, Vector3, UniversalCamera, Mesh, DeepImmutableObject, ShadowGenerator, Color3, StandardMaterial, ExecuteCodeAction } from "babylonjs";
 import * as BABYLON from 'babylonjs';
-import { client } from ".";
 import { PHYSICS_ENGINE_NAME } from "./physics_handler";
 
 export class Renderer {
     canvas: HTMLCanvasElement;
-    shapes: { [_ in string]?: Shape };
+    shapes: Map<string, Shape>;
     engine: Engine;
     scene?: Scene;
     generator?: ShadowGenerator;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
-        this.shapes = {};
+        this.shapes = new Map();
         this.engine = new Engine(canvas, true);
     }
 
     clearShapes() {
-        for (let key in this.shapes) {
-            if (this.shapes.hasOwnProperty(key)) {
-                let shape = this.shapes[key]!;
+        for (let key of this.shapes.keys()) {
+            if (this.shapes.has(key)) {
+                let shape = this.shapes.get(key)!;
                 this.generator?.removeShadowCaster(shape.mesh);
                 shape.mesh.dispose();
-                delete this.shapes[key];
+                this.shapes.delete(key);
             }
         }
     }
@@ -67,12 +66,14 @@ export class Renderer {
         return scene;
     }
 
-    createPolygon(id: string, centroid: Vector2, points: Vector2[], color: Color3, scale: number = 1) {
+    createPolygon(id: string, centroid: Vector2, points: Vector2[], color: Color3, scale: number = 1): Shape {
         if (this.scene) {
             let shape = Shape.createPolygon(id, centroid, points, this.scene, color, scale);
-            this.shapes[id] = shape;
+            this.shapes.set(id, shape);
             this.generator?.addShadowCaster(shape.mesh);
+            return shape;
         }
+        throw new Error("Scene not initialized!")
     }
 
     start() {
@@ -118,25 +119,6 @@ export class Shape {
         mesh.material = mat;
 
         mesh.actionManager = new BABYLON.ActionManager(scene);
-        mesh.actionManager.registerAction(
-            new ExecuteCodeAction(
-                BABYLON.ActionManager.OnPickTrigger,
-                () => {
-                    console.log("Clicking on object ", id, ".")
-                    client.sendJSON({
-                        type: "MESSAGE",
-                        target: {
-                            type: "NAME",
-                            name: PHYSICS_ENGINE_NAME
-                        },
-                        data: {
-                            type: "TOGGLE_COLOR",
-                            id: id,
-                        }
-                    })
-                }
-            )
-        );
 
         return new Shape(centroid, mesh);
     }

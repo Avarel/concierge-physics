@@ -1,7 +1,6 @@
 import * as ConciergeAPI from "./concierge_api";
-import { DeepImmutable, Vector2, DeepImmutableArray, Color3 } from "babylonjs";
-import { renderer } from ".";
-import { Shape } from "./renderer";
+import { DeepImmutable, Vector2, DeepImmutableArray, Color3, ExecuteCodeAction } from "babylonjs";
+import { Renderer } from "./renderer";
 
 export interface Vec2f {
     x: number,
@@ -72,60 +71,30 @@ function tuple2color3(tuple: DeepImmutable<RgbColor>): Color3 {
     return new Color3(clamp(tuple[0]), clamp(tuple[1]), clamp(tuple[2]))
 }
 
-export class PhysicsHandler extends ConciergeAPI.EventHandler {
-    subscribeInterval: number = 5000;
-    subscribeHandle: number | undefined;
+export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
+    readonly renderer: Renderer;
+    readonly client: ConciergeAPI.Client;
 
-    onRecvHello(client: ConciergeAPI.Client, hello: ConciergeAPI.Hello) {
-        this.trySubscribe(client);
+    constructor(client: ConciergeAPI.Client, renderer: Renderer) {
+        super(client, PHYSICS_ENGINE_GROUP);
+        this.client = client;
+        this.renderer = renderer;
     }
 
-    onRecvMessage(client: ConciergeAPI.Client, message: ConciergeAPI.Message<any>) {
+    onRecvHello(hello: ConciergeAPI.Hello) {
+        this.trySubscribe();
+    }
+
+    onRecvMessage(message: ConciergeAPI.Message<any>) {
         if (message.origin!.name != PHYSICS_ENGINE_NAME) {
             return;
         }
         this.processPhysicsPayload(message.data as PhysicsPayload);
     }
 
-    onRecvStatus(client: ConciergeAPI.Client, status: ConciergeAPI.Status<any>): void {
-        switch (status.code) {
-            case ConciergeAPI.StatusCode.NO_SUCH_GROUP:
-                if (status.data == PHYSICS_ENGINE_GROUP) {
-                    console.error("Group ", PHYSICS_ENGINE_GROUP, " does not exist on concierge, is the simulation server on?")
-                }
-                break;
-            case ConciergeAPI.StatusCode.SUBSCRIBED:
-                // subscription complete, stop trying to join
-                if (status.data == PHYSICS_ENGINE_GROUP) {
-                    this.cancelSubscribe();
-                    this.onSubscribe(client);
-                }
-                break;
-            case ConciergeAPI.StatusCode.UNSUBSCRIBED:
-                if (status.data == PHYSICS_ENGINE_GROUP) {
-                    this.trySubscribe(client);
-                }
-                break;
-        }
-    }
-
-    private trySubscribe(client: ConciergeAPI.Client) {
-        // try to subscribe until good ("STATUS" handle)
-        let subFn = () => {
-            console.log("Attempting to subscribe to ", PHYSICS_ENGINE_GROUP);
-            client.sendJSON({
-                type: "SUBSCRIBE",
-                group: PHYSICS_ENGINE_GROUP
-            });
-        };
-
-        subFn();
-        this.subscribeHandle = window.setInterval(subFn, this.subscribeInterval);
-    }
-
-    private onSubscribe(client: ConciergeAPI.Client) {
+    onSubscribe() {
         console.log("Subscribed!");
-        client.sendJSON({
+        this.client.sendJSON({
             type: "MESSAGE",
             target: {
                 type: "NAME",
@@ -137,21 +106,38 @@ export class PhysicsHandler extends ConciergeAPI.EventHandler {
         });
     }
 
-    private cancelSubscribe() {
-        clearInterval(this.subscribeHandle)
-        this.subscribeHandle = undefined;
+    onUnsubscribe() {
+        this.renderer.clearShapes();
     }
-
 
     private createShape(id: string, centroid: Vec2f, points: DeepImmutableArray<Vec2f>, color: DeepImmutable<RgbColor>, scale: number = 1) {
         let centroidv = vec2f2vector2(centroid);
         let pointsv = points.map(vec2f2vector2);
         let color3 = tuple2color3(color);
-        renderer.createPolygon(id, centroidv, pointsv, color3, scale);
+        let shape = this.renderer.createPolygon(id, centroidv, pointsv, color3, scale);
+        shape.mesh.actionManager!.registerAction(
+            new ExecuteCodeAction(
+                BABYLON.ActionManager.OnPickTrigger,
+                () => {
+                    console.log("Clicking on object ", id, ".")
+                    this.client.sendJSON({
+                        type: "MESSAGE",
+                        target: {
+                            type: "NAME",
+                            name: PHYSICS_ENGINE_NAME
+                        },
+                        data: {
+                            type: "TOGGLE_COLOR",
+                            id: id,
+                        }
+                    })
+                }
+            )
+        );
     }
 
     private updateShape(id: string, centroid: Vec2f) {
-        let shape = renderer.shapes[id];
+        let shape = this.renderer.shapes.get(id);
         if (shape) {
             shape.moveTo(vec2f2vector2(centroid));
         } else {
@@ -160,7 +146,7 @@ export class PhysicsHandler extends ConciergeAPI.EventHandler {
     }
 
     private updateColor(id: string, color: DeepImmutable<RgbColor>) {
-        let shape = renderer.shapes[id];
+        let shape = this.renderer.shapes.get(id);
         if (shape) {
             shape.setColor(tuple2color3(color));
         } else {
@@ -172,7 +158,7 @@ export class PhysicsHandler extends ConciergeAPI.EventHandler {
         switch (payload.type) {
             case "ENTITY_DUMP":
                 console.log("Dumping entities!");
-                renderer.clearShapes();
+                this.renderer.clearShapes();
                 for (let entity of payload.entities) {
                     this.createShape(entity.id, entity.centroid, entity.points, entity.color);
                 }
