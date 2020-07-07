@@ -1,38 +1,36 @@
-import { Engine, Scene, Vector2, Vector3, UniversalCamera, Mesh, DeepImmutableObject, ShadowGenerator, Color3, StandardMaterial, ExecuteCodeAction } from "babylonjs";
 import * as BABYLON from 'babylonjs';
-import { PHYSICS_ENGINE_NAME } from "./physics_handler";
+import * as GUI from 'babylonjs-gui';
+import { Vector2, Color3, DeepImmutableObject, Vector3 } from 'babylonjs';
 
 export class Renderer {
     canvas: HTMLCanvasElement;
-    shapes: Map<string, Shape>;
-    engine: Engine;
-    scene?: Scene;
-    generator?: ShadowGenerator;
+    engine: BABYLON.Engine;
+    scene?: BABYLON.Scene;
+    generator?: BABYLON.ShadowGenerator;
+    uiTexture?: GUI.AdvancedDynamicTexture;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
-        this.shapes = new Map();
-        this.engine = new Engine(canvas, true);
+        
+        this.engine = new BABYLON.Engine(canvas, true);
     }
 
-    clearShapes() {
-        for (let key of this.shapes.keys()) {
-            if (this.shapes.has(key)) {
-                let shape = this.shapes.get(key)!;
-                this.generator?.removeShadowCaster(shape.mesh);
-                shape.mesh.dispose();
-                this.shapes.delete(key);
-            }
+    createUITexture() {
+        if (this.uiTexture) {
+            this.uiTexture.dispose();
         }
+
+        let uiTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        this.uiTexture = uiTexture;
     }
 
-    createScene(): Scene {
+    createScene() {
         if (this.scene) {
             this.scene.dispose();
         }
 
-        let scene = new Scene(this.engine);
-        let camera = new UniversalCamera("UniversalCamera", new Vector3(500, 800, -100), scene);
+        let scene = new BABYLON.Scene(this.engine);
+        let camera = new BABYLON.UniversalCamera("UniversalCamera", new Vector3(500, 800, -100), scene);
         camera.setTarget(new Vector3(500, 0, 500));
         camera.speed = 15;
         camera.attachControl(this.canvas, true);
@@ -63,22 +61,15 @@ export class Renderer {
         var vrHelper = scene.createDefaultVRExperience({ createDeviceOrientationCamera: false });
         vrHelper.enableTeleportation({ floorMeshes: [helper!.ground!] });
 
-        return scene;
-    }
-
-    createPolygon(id: string, centroid: Vector2, points: Vector2[], color: Color3, scale: number = 1): Shape {
-        if (this.scene) {
-            let shape = Shape.createPolygon(id, centroid, points, this.scene, color, scale);
-            this.shapes.set(id, shape);
-            this.generator?.addShadowCaster(shape.mesh);
-            return shape;
-        }
-        throw new Error("Scene not initialized!")
+        this.scene = scene;
     }
 
     start() {
         if (this.scene == undefined) {
-            this.scene = this.createScene();
+            this.createScene();
+        }
+        if (this.uiTexture == undefined) {
+            this.createUITexture();
         }
 
         let renderFunc = () => {
@@ -101,14 +92,14 @@ export class Renderer {
 
 export class Shape {
     centroid: Vector2;
-    mesh: Mesh;
+    mesh: BABYLON.Mesh;
 
-    private constructor(centroid: Vector2, mesh: Mesh) {
+    private constructor(centroid: Vector2, mesh: BABYLON.Mesh) {
         this.centroid = centroid;
         this.mesh = mesh;
     }
 
-    static createPolygon(id: string, centroid: Vector2, points: Vector2[], scene: Scene, color: Color3, scale: number = 1): Shape {
+    static createPolygon(id: string, centroid: Vector2, points: Vector2[], scene: BABYLON.Scene, color: Color3, scale: number = 1): Shape {
         let corners = points.map((v) => v.scale(scale));
         let poly_tri = new BABYLON.PolygonMeshBuilder("polytri", corners, scene);
         let mesh = poly_tri.build(undefined, 50);
@@ -124,7 +115,7 @@ export class Shape {
     }
 
     setColor(color: DeepImmutableObject<Color3>) {
-        (this.mesh.material! as StandardMaterial).diffuseColor! = color;
+        (this.mesh.material! as BABYLON.StandardMaterial).diffuseColor! = color;
     }
 
     moveTo(point: DeepImmutableObject<Vector2>) {

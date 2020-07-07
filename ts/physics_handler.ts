@@ -1,6 +1,6 @@
 import * as ConciergeAPI from "./concierge_api";
 import { DeepImmutable, Vector2, DeepImmutableArray, Color3, ExecuteCodeAction } from "babylonjs";
-import { Renderer } from "./renderer";
+import { Renderer, Shape } from "./renderer";
 
 export interface Vec2f {
     x: number,
@@ -57,8 +57,6 @@ type PhysicsPayload = EntityDump | PositionDump
 export const PHYSICS_ENGINE_NAME = "physics_engine";
 export const PHYSICS_ENGINE_GROUP = "physics_engine_out";
 
-type ConciergePayload = ConciergeAPI.Payload<PhysicsPayload>;
-
 function vec2f2vector2(vec: Vec2f): Vector2 {
     return new Vector2(vec.x, vec.y);
 }
@@ -75,10 +73,13 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
     readonly renderer: Renderer;
     readonly client: ConciergeAPI.Client;
 
+    private shapes: Map<string, Shape>;
+
     constructor(client: ConciergeAPI.Client, renderer: Renderer) {
         super(client, PHYSICS_ENGINE_GROUP);
         this.client = client;
         this.renderer = renderer;
+        this.shapes = new Map();
     }
 
     onRecvHello(hello: ConciergeAPI.Hello) {
@@ -93,7 +94,6 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
     }
 
     onSubscribe() {
-        console.log("Subscribed!");
         this.client.sendJSON({
             type: "MESSAGE",
             target: {
@@ -107,14 +107,35 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
     }
 
     onUnsubscribe() {
-        this.renderer.clearShapes();
+        this.clearShapes();
+    }
+
+    clearShapes() {
+        for (let key of this.shapes.keys()) {
+            if (this.shapes.has(key)) {
+                let shape = this.shapes.get(key)!;
+                this.renderer.generator?.removeShadowCaster(shape.mesh);
+                shape.mesh.dispose();
+                this.shapes.delete(key);
+            }
+        }
+    }
+
+    createPolygon(id: string, centroid: Vector2, points: Vector2[], color: Color3, scale: number = 1): Shape {
+        if (this.renderer.scene) {
+            let shape = Shape.createPolygon(id, centroid, points, this.renderer.scene, color, scale);
+            this.shapes.set(id, shape);
+            this.renderer.generator?.addShadowCaster(shape.mesh);
+            return shape;
+        }
+        throw new Error("Scene not initialized!")
     }
 
     private createShape(id: string, centroid: Vec2f, points: DeepImmutableArray<Vec2f>, color: DeepImmutable<RgbColor>, scale: number = 1) {
         let centroidv = vec2f2vector2(centroid);
         let pointsv = points.map(vec2f2vector2);
         let color3 = tuple2color3(color);
-        let shape = this.renderer.createPolygon(id, centroidv, pointsv, color3, scale);
+        let shape = this.createPolygon(id, centroidv, pointsv, color3, scale);
         shape.mesh.actionManager!.registerAction(
             new ExecuteCodeAction(
                 BABYLON.ActionManager.OnPickTrigger,
@@ -137,7 +158,7 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
     }
 
     private updateShape(id: string, centroid: Vec2f) {
-        let shape = this.renderer.shapes.get(id);
+        let shape = this.shapes.get(id);
         if (shape) {
             shape.moveTo(vec2f2vector2(centroid));
         } else {
@@ -146,7 +167,7 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
     }
 
     private updateColor(id: string, color: DeepImmutable<RgbColor>) {
-        let shape = this.renderer.shapes.get(id);
+        let shape = this.shapes.get(id);
         if (shape) {
             shape.setColor(tuple2color3(color));
         } else {
@@ -158,7 +179,7 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
         switch (payload.type) {
             case "ENTITY_DUMP":
                 console.log("Dumping entities!");
-                this.renderer.clearShapes();
+                this.clearShapes();
                 for (let entity of payload.entities) {
                     this.createShape(entity.id, entity.centroid, entity.points, entity.color);
                 }

@@ -306,6 +306,10 @@ export abstract class ServiceEventHandler extends EventHandler {
         this.group = group;
     }
 
+    onClose(event: CloseEvent) {
+        this.onUnsubscribe();
+    }
+
     /**
      * Try to regularly subscribe to a group until it succeeds.
      */
@@ -351,14 +355,16 @@ export abstract class ServiceEventHandler extends EventHandler {
                 }
                 break;
             case StatusCode.SUBSCRIBED:
-                // subscription complete, stop trying to join
                 if (status.data == this.group) {
+                    // subscription complete, stop trying to join
+                    console.log("Subscribed to `", this.group, "`.");
                     this.cancelSubscribe();
                     this.onSubscribe();
                 }
                 break;
             case StatusCode.UNSUBSCRIBED:
                 if (status.data == this.group) {
+                    console.log("Unsubscribed from `", this.group, "`.");
                     this.trySubscribe();
                     this.onUnsubscribe();
                 }

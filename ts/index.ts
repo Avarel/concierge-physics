@@ -1,6 +1,7 @@
 import { Renderer } from "./renderer";
 import * as ConciergeAPI from "./concierge_api";
 import { PhysicsHandler } from "./physics_handler";
+import { ChatHandler } from "./chat_handler";
 
 let canvas = document.querySelector<HTMLCanvasElement>("#renderCanvas");
 if (!canvas) {
@@ -12,7 +13,6 @@ var url = prompt("Please enter the server address", "ws://127.0.0.1:64209/ws")
 
 if (url == "debug") {
     let renderer = new Renderer(canvas);
-    renderer.scene = renderer.createScene();
     renderer.start();
     throw "Debug mode"
 }
@@ -27,12 +27,14 @@ if (!person || person.length == 0) {
 }
 
 let renderer = new Renderer(canvas);
-renderer.scene = renderer.createScene();
 
 let client = new ConciergeAPI.Client(person, url, true);
 let physicsHandler = new PhysicsHandler(client, renderer);
 client.handlers.push(physicsHandler);
-client.connect("0.1.0");
+
+let chatHandler = new ChatHandler(client, renderer);
+client.handlers.push(chatHandler);
 
 renderer.start();
 
+client.connect("0.1.0");

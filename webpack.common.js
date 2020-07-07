@@ -10,7 +10,8 @@ module.exports = {
         path: path.resolve(__dirname, 'dist')
     },
     externals: {
-        'babylonjs': "BABYLON"
+        'babylonjs': "BABYLON",
+        'babylonjs-gui': "BABYLON.GUI"
     },
     resolve: {
         extensions: [".ts"]
