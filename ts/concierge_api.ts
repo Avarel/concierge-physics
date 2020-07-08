@@ -21,24 +21,7 @@ export type DeepImmutableObject<T> = {
     readonly [K in keyof T]: DeepImmutable<T[K]>;
 };
 
-interface DeepImmutableArray<T> extends ReadonlyArray<DeepImmutable<T>> { }
-
-export enum StatusCode {
-    OK = 2000,
-    MESSAGE_SENT = 2001,
-    SUBSCRIBED = 2002,
-    UNSUBSCRIBED = 2003,
-    CREATED_GROUP = 2004,
-    DELETED_GROUP = 2005,
-
-    BAD = 4000,
-    UNSUPPORTED = 4001,
-    PROTOCOL = 4002,
-    GROUP_ALREADY_CREATED = 4003,
-    NO_SUCH_NAME = 4004,
-    NO_SUCH_UUID = 4005,
-    NO_SUCH_GROUP = 4006
-}
+export type DeepImmutableArray<T> = ReadonlyArray<DeepImmutable<T>>;
 
 export interface Origin {
     name: string,
@@ -46,82 +29,128 @@ export interface Origin {
     group?: string,
 }
 
-export interface BaseTarget<T extends string> {
-    type: T
-}
-export interface TargetName extends BaseTarget<"NAME"> {
-    name: string
-}
-export interface TargetUuid extends BaseTarget<"UUID"> {
-    uuid: Uuid,
-}
-export interface TargetGroup extends BaseTarget<"GROUP"> {
-    group: string
-}
-export interface TargetAll extends BaseTarget<"ALL"> { }
+export namespace Targets {
+    export interface BaseTarget<T extends string> {
+        type: T
+    }
+    export interface TargetName extends BaseTarget<"NAME"> {
+        name: string
+    }
+    export interface TargetUuid extends BaseTarget<"UUID"> {
+        uuid: Uuid,
+    }
+    export interface TargetGroup extends BaseTarget<"GROUP"> {
+        group: string
+    }
+    type TargetAll = BaseTarget<"ALL">;
 
-export type Target = TargetName | TargetUuid | TargetGroup | TargetAll;
+    export type Target = TargetName | TargetUuid | TargetGroup | TargetAll;
+}
+export type Target = Targets.Target;
 
-export interface BasePayload<T extends string> {
-    type: T
-}
+export namespace Payloads {
+    export interface BasePayload<T extends string> {
+        type: T
+    }
 
-export interface Identify extends BasePayload<"IDENTIFY"> {
-    name: string,
-    version: string,
-    secret?: string
-}
-export interface Message<T> extends BasePayload<"MESSAGE"> {
-    target: Target,
-    origin?: Origin,
-    data: T
-}
-export interface Subscribe extends BasePayload<"SUBSCRIBE"> {
-    group: string
-}
-export interface Unsubscribe extends BasePayload<"UNSUBSCRIBE"> {
-    group: string
-}
-export interface CreateGroup extends BasePayload<"CREATE_GROUP"> {
-    group: string
-}
-export interface DeleteGroup extends BasePayload<"DELETE_GROUP"> {
-    group: string
-}
-export interface FetchGroupSubs extends BasePayload<"FETCH_GROUP_SUB_LIST"> {
-    group: string
-}
-export interface FetchGroupList extends BasePayload<"FETCH_GROUP_LIST"> { }
-export interface FetchClientList extends BasePayload<"FETCH_CLIENT_LIST"> { }
-export interface FetchSubList extends BasePayload<"FETCH_SUB_LIST"> { }
-export interface Hello extends BasePayload<"HELLO"> {
-    uuid: Uuid,
-    version: string
-}
-export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST"> {
-    group: string,
-    clients: Origin[]
-}
-export interface GroupList extends BasePayload<"GROUP_LIST"> {
-    groups: string[]
-}
-export interface ClientList extends BasePayload<"CLIENT_LIST"> {
-    clients: Origin[]
-}
-export interface SubList extends BasePayload<"SUB_LIST"> {
-    groups: string[],
-}
-export interface ClientJoin extends BasePayload<"CLIENT_JOIN">, Origin { }
-export interface ClientLeave extends BasePayload<"CLIENT_LEAVE">, Origin { }
-export interface Status<T> extends BasePayload<"STATUS"> {
-    code: StatusCode,
-    data: T
-}
+    export interface Identify extends BasePayload<"IDENTIFY"> {
+        name: string,
+        version: string,
+        secret?: string
+    }
+    export interface Message<T> extends BasePayload<"MESSAGE"> {
+        target: Target,
+        origin?: Origin,
+        data: T
+    }
+    export interface Subscribe extends BasePayload<"SUBSCRIBE"> {
+        group: string
+    }
+    export interface Unsubscribe extends BasePayload<"UNSUBSCRIBE"> {
+        group: string
+    }
+    export interface CreateGroup extends BasePayload<"CREATE_GROUP"> {
+        group: string
+    }
+    export interface DeleteGroup extends BasePayload<"DELETE_GROUP"> {
+        group: string
+    }
+    export interface FetchGroupSubs extends BasePayload<"FETCH_GROUP_SUB_LIST"> {
+        group: string
+    }
+    export type FetchGroupList = BasePayload<"FETCH_GROUP_LIST">;
+    export type FetchClientList = BasePayload<"FETCH_CLIENT_LIST">;
+    export type FetchSubList = BasePayload<"FETCH_SUB_LIST">;
+    export interface Hello extends BasePayload<"HELLO"> {
+        uuid: Uuid,
+        version: string
+    }
+    export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST"> {
+        group: string,
+        clients: Origin[]
+    }
+    export interface GroupList extends BasePayload<"GROUP_LIST"> {
+        groups: string[]
+    }
+    export interface ClientList extends BasePayload<"CLIENT_LIST"> {
+        clients: Origin[]
+    }
+    export interface SubList extends BasePayload<"SUB_LIST"> {
+        groups: string[],
+    }
+    export type ClientJoin = BasePayload<"CLIENT_JOIN"> & Origin;
+    export type ClientLeave = BasePayload<"CLIENT_LEAVE"> & Origin;
 
-export type Payload<M> = Identify | Message<M> | Subscribe | Unsubscribe
-    | CreateGroup | DeleteGroup | FetchGroupSubs
-    | FetchGroupList | FetchSubList | Hello | GroupSubs | GroupList
-    | ClientList | SubList | ClientJoin | ClientLeave | Status<any>;
+    namespace Statuses {
+        export interface BaseStatus<T extends string> extends BasePayload<"STATUS"> {
+            seq?: number,
+            code: T
+        }
+
+        export type Ok = BaseStatus<"OK">;
+        export type MessageSent = BaseStatus<"MESSAGE_SENT">;
+        export interface Subscribed extends BaseStatus<"SUBSCRIBED"> {
+            group: string
+        }
+        export interface Unsubscribed extends BaseStatus<"UNSUBSCRIBED"> {
+            group: string
+        }
+        export interface GroupCreated extends BaseStatus<"GROUP_CREATED"> {
+            group: string
+        }
+        export interface GroupDeleted extends BaseStatus<"GROUP_DELETED"> {
+            group: string
+        }
+        export type Bad = BaseStatus<"BAD">;
+        export type Unsupported = BaseStatus<"UNSUPPORTED">;
+        export interface Protocol extends BaseStatus<"PROTOCOL"> {
+            desc: string
+        }
+        export interface GroupAlreadyCreated extends BaseStatus<"GROUP_ALREADY_CREATED"> {
+            group: string
+        }
+        export interface NoSuchName extends BaseStatus<"NO_SUCH_NAME"> {
+            name: string
+        }
+        export interface NoSuchUuid extends BaseStatus<"NO_SUCH_UUID"> {
+            uuid: Uuid
+        }
+        export interface NoSuchGroup extends BaseStatus<"NO_SUCH_GROUP"> {
+            group: string
+        }
+
+        export type Status = Ok | MessageSent | Subscribed | Unsubscribed
+            | GroupCreated | GroupDeleted | Bad | Unsupported | Protocol
+            | GroupAlreadyCreated | NoSuchName | NoSuchUuid | NoSuchGroup;
+    }
+    export type Status = Statuses.Status;
+
+    export type GenericPayload<M> = Identify | Message<M> | Subscribe | Unsubscribe
+        | CreateGroup | DeleteGroup | FetchGroupSubs
+        | FetchGroupList | FetchSubList | Hello | GroupSubs | GroupList
+        | ClientList | SubList | ClientJoin | ClientLeave | Status;
+}
+export type GenericPayload<T> = Payloads.GenericPayload<T>;
 
 /**
  * Central connector to the concierge.
@@ -156,7 +185,7 @@ export class Client {
         this.socket.onclose = event => this.onClose(event);
     }
 
-    sendJSON(payload: Payload<any>) {
+    sendJSON(payload: GenericPayload<any>) {
         if (this.socket == undefined) {
             throw new Error("Socket is not connected")
         }
@@ -213,7 +242,7 @@ export class Client {
     private onReceive(event: MessageEvent) {
         let data = JSON.parse(event.data) as object;
         if (data.hasOwnProperty("type")) {
-            let payload = data as Payload<any>;
+            let payload = data as GenericPayload<any>;
 
             if (payload.type == "HELLO") {
                 this.uuid = payload.uuid;
@@ -240,7 +269,7 @@ export class Client {
 export interface RawHandler {
     onOpen?(event: Event): void;
     onClose?(event: CloseEvent): void;
-    onReceive?(payload: Payload<any>): void;
+    onReceive?(payload: GenericPayload<any>): void;
     onError?(event: Event): void;
 }
 
@@ -248,7 +277,7 @@ export interface RawHandler {
  * Class that allows for high level interaction with incoming payloads.
  */
 export abstract class EventHandler implements RawHandler {
-    onReceive(payload: Payload<any>): void {
+    onReceive(payload: GenericPayload<any>): void {
         switch (payload.type) {
             case "MESSAGE":
                 this.onRecvMessage?.(payload);
@@ -280,15 +309,15 @@ export abstract class EventHandler implements RawHandler {
         }
     }
 
-    onRecvMessage?(message: Message<any>): void;
-    onRecvHello?(hello: Hello): void;
-    onRecvGroupSubs?(groupSubs: GroupSubs): void;
-    onRecvGroupList?(groupList: GroupList): void;
-    onRecvClientList?(clientList: ClientList): void;
-    onRecvSubs?(subs: SubList): void;
-    onRecvClientJoin?(clientJoin: ClientJoin): void;
-    onRecvClientLeave?(clientLeave: ClientLeave): void;
-    onRecvStatus?(status: Status<any>): void;
+    onRecvMessage?(message: Payloads.Message<any>): void;
+    onRecvHello?(hello: Payloads.Hello): void;
+    onRecvGroupSubs?(groupSubs: Payloads.GroupSubs): void;
+    onRecvGroupList?(groupList: Payloads.GroupList): void;
+    onRecvClientList?(clientList: Payloads.ClientList): void;
+    onRecvSubs?(subs: Payloads.SubList): void;
+    onRecvClientJoin?(clientJoin: Payloads.ClientJoin): void;
+    onRecvClientLeave?(clientLeave: Payloads.ClientLeave): void;
+    onRecvStatus?(status: Payloads.Status): void;
 }
 
 /**
@@ -306,8 +335,9 @@ export abstract class ServiceEventHandler extends EventHandler {
         this.group = group;
     }
 
-    onClose(event: CloseEvent) {
+    onClose(_event: CloseEvent) {
         this.onUnsubscribe();
+        this.cancelSubscribe();
     }
 
     /**
@@ -347,23 +377,23 @@ export abstract class ServiceEventHandler extends EventHandler {
         this.subscribeHandle = undefined;
     }
 
-    onRecvStatus(status: Status<any>): void {
+    onRecvStatus(status: Payloads.Status): void {
         switch (status.code) {
-            case StatusCode.NO_SUCH_GROUP:
-                if (status.data == this.group) {
-                    console.error("Group `", this.group, "`does not exist on concierge, is the simulation server on?")
+            case "NO_SUCH_GROUP":
+                if (status.group == this.group) {
+                    console.error("Group `", this.group, "` does not exist on concierge, is the simulation server on?")
                 }
                 break;
-            case StatusCode.SUBSCRIBED:
-                if (status.data == this.group) {
+            case "SUBSCRIBED":
+                if (status.group == this.group) {
                     // subscription complete, stop trying to join
                     console.log("Subscribed to `", this.group, "`.");
                     this.cancelSubscribe();
                     this.onSubscribe();
                 }
                 break;
-            case StatusCode.UNSUBSCRIBED:
-                if (status.data == this.group) {
+            case "UNSUBSCRIBED":
+                if (status.group == this.group) {
                     console.log("Unsubscribed from `", this.group, "`.");
                     this.trySubscribe();
                     this.onUnsubscribe();

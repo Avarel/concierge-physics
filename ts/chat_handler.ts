@@ -17,7 +17,7 @@ export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
         this.client = client;
     }
 
-    onRecvHello(hello: ConciergeAPI.Hello) {
+    onRecvHello(hello: ConciergeAPI.Payloads.Hello) {
         this.trySubscribe();
     }
 
@@ -87,12 +87,12 @@ export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
         this.input.text = INIT_CHAT;
     }
 
-    onRecvMessage(message: ConciergeAPI.Message<any>) {
+    onRecvMessage(message: ConciergeAPI.Payloads.Message<any>) {
         if (message.origin!.group != CHAT_GROUP) {
             return;
         }
         if (this.output.text.length != 0) {
-            this.output.text += "\n";
+            this.output.text += "\nz";
         } 
         this.output.text += `${message.origin!.name}: ${message.data}`;
     }
