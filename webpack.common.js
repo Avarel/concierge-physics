@@ -2,7 +2,7 @@ const path = require("path");
 
 module.exports = {
     entry: {
-        index: './ts/index.ts',
+        index: './src/index.ts',
     },
     output: {
         filename: '[name].bundle.js',

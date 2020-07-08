@@ -8,16 +8,29 @@ const INIT_CHAT = "Click to chat.";
 export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
     readonly renderer: Renderer;
     readonly client: ConciergeAPI.Client;
-    input!: GUI.InputText;
-    output!: GUI.TextBlock;
+
+    uiTexture?: GUI.AdvancedDynamicTexture;
+    input?: GUI.InputText;
+    output?: GUI.TextBlock;
 
     constructor(client: ConciergeAPI.Client, renderer: Renderer) {
         super(client, CHAT_GROUP);
         this.renderer = renderer;
         this.client = client;
     }
-    
+
+    private createUITexture() {
+        if (this.uiTexture) {
+            this.uiTexture.dispose();
+        }
+
+        let uiTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        this.uiTexture = uiTexture;
+    }
+
     onSubscribe() {
+        this.createUITexture();
+
         let panel = new GUI.StackPanel();
         panel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
         panel.fontFamily = "monospace";
@@ -68,10 +81,14 @@ export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
         this.input = input;
         panel.addControl(this.input);
 
-        this.renderer.uiTexture!.addControl(panel);
+        this.uiTexture!.addControl(panel);
     }
 
     onEnter() {
+        if (this.input == undefined) {
+            console.warn("Chat input UI has not been created");
+            return;
+        }
         this.client.sendJSON({
             type: "MESSAGE",
             target: {
@@ -87,6 +104,10 @@ export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
         if (message.origin!.group != CHAT_GROUP) {
             return;
         }
+        if (this.output == undefined) {
+            console.warn("Chat output UI has not been created");
+            return;
+        }
         if (this.output.text.length != 0) {
             this.output.text += "\nz";
         } 
@@ -94,6 +115,8 @@ export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
     }
 
     onUnsubscribe() {
-
+        this.input?.dispose();
+        this.output?.dispose();
+        this.uiTexture?.dispose();
     }
 }

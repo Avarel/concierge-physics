@@ -1,4 +1,5 @@
-# Concierge Physics
+# ERT Concierge Physics
+This is the Babylon.JS front-end for the ERT concierge.
 
 ## Building and Running
 * Install NPM version `6.14.5` or above.

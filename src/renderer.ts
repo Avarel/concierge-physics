@@ -1,5 +1,4 @@
 import * as BABYLON from 'babylonjs';
-import * as GUI from 'babylonjs-gui';
 import { Vector2, Color3, DeepImmutableObject, Vector3 } from 'babylonjs';
 
 export class Renderer {
@@ -7,21 +6,11 @@ export class Renderer {
     engine: BABYLON.Engine;
     scene?: BABYLON.Scene;
     generator?: BABYLON.ShadowGenerator;
-    uiTexture?: GUI.AdvancedDynamicTexture;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         
         this.engine = new BABYLON.Engine(canvas, true);
-    }
-
-    createUITexture() {
-        if (this.uiTexture) {
-            this.uiTexture.dispose();
-        }
-
-        let uiTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
-        this.uiTexture = uiTexture;
     }
 
     createScene() {
@@ -67,9 +56,6 @@ export class Renderer {
     start() {
         if (this.scene == undefined) {
             this.createScene();
-        }
-        if (this.uiTexture == undefined) {
-            this.createUITexture();
         }
 
         let renderFunc = () => {
