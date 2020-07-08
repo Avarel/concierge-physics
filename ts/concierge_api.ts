@@ -53,6 +53,10 @@ export namespace Payloads {
         type: T
     }
 
+    interface HasGroupField {
+        group: string
+    }
+
     export interface Identify extends BasePayload<"IDENTIFY"> {
         name: string,
         version: string,
@@ -63,21 +67,11 @@ export namespace Payloads {
         origin?: Origin,
         data: T
     }
-    export interface Subscribe extends BasePayload<"SUBSCRIBE"> {
-        group: string
-    }
-    export interface Unsubscribe extends BasePayload<"UNSUBSCRIBE"> {
-        group: string
-    }
-    export interface CreateGroup extends BasePayload<"CREATE_GROUP"> {
-        group: string
-    }
-    export interface DeleteGroup extends BasePayload<"DELETE_GROUP"> {
-        group: string
-    }
-    export interface FetchGroupSubs extends BasePayload<"FETCH_GROUP_SUB_LIST"> {
-        group: string
-    }
+    export type Subscribe = BasePayload<"SUBSCRIBE"> & HasGroupField;
+    export type Unsubscribe = BasePayload<"UNSUBSCRIBE"> & HasGroupField;
+    export type CreateGroup = BasePayload<"CREATE_GROUP"> & HasGroupField;
+    export type DeleteGroup = BasePayload<"DELETE_GROUP"> & HasGroupField;
+    export type FetchGroupSubs = BasePayload<"FETCH_GROUP_SUB_LIST"> & HasGroupField;
     export type FetchGroupList = BasePayload<"FETCH_GROUP_LIST">;
     export type FetchClientList = BasePayload<"FETCH_CLIENT_LIST">;
     export type FetchSubList = BasePayload<"FETCH_SUB_LIST">;
@@ -85,8 +79,7 @@ export namespace Payloads {
         uuid: Uuid,
         version: string
     }
-    export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST"> {
-        group: string,
+    export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST">, HasGroupField {
         clients: Origin[]
     }
     export interface GroupList extends BasePayload<"GROUP_LIST"> {
@@ -102,40 +95,37 @@ export namespace Payloads {
     export type ClientLeave = BasePayload<"CLIENT_LEAVE"> & Origin;
 
     namespace Statuses {
+        /** These statuses may be sequenced. */ 
         export interface BaseStatus<T extends string> extends BasePayload<"STATUS"> {
-            seq?: number,
             code: T
+            seq?: number,
+        }
+        /** These statuses are always sequenced. */ 
+        export interface SequencedStatus<T extends string> extends BaseStatus<T> {
+            seq: number,
         }
 
-        export type Ok = BaseStatus<"OK">;
-        export type MessageSent = BaseStatus<"MESSAGE_SENT">;
-        export interface Subscribed extends BaseStatus<"SUBSCRIBED"> {
-            group: string
-        }
-        export interface Unsubscribed extends BaseStatus<"UNSUBSCRIBED"> {
-            group: string
-        }
-        export interface GroupCreated extends BaseStatus<"GROUP_CREATED"> {
-            group: string
-        }
-        export interface GroupDeleted extends BaseStatus<"GROUP_DELETED"> {
-            group: string
-        }
-        export type Bad = BaseStatus<"BAD">;
-        export type Unsupported = BaseStatus<"UNSUPPORTED">;
-        export interface Protocol extends BaseStatus<"PROTOCOL"> {
+        export type Ok = SequencedStatus<"OK">;
+        export type MessageSent = SequencedStatus<"MESSAGE_SENT">;
+        export type Subscribed = SequencedStatus<"SUBSCRIBED"> & HasGroupField;
+        export type Unsubscribed = BaseStatus<"UNSUBSCRIBED"> & HasGroupField;
+        export type GroupCreated = BaseStatus<"GROUP_CREATED">  & HasGroupField;
+        export type GroupDeleted = BaseStatus<"GROUP_DELETED"> & HasGroupField;
+        export type Bad = SequencedStatus<"BAD">;
+        export type Unsupported = SequencedStatus<"UNSUPPORTED">;
+        export interface Protocol extends SequencedStatus<"PROTOCOL"> {
             desc: string
         }
-        export interface GroupAlreadyCreated extends BaseStatus<"GROUP_ALREADY_CREATED"> {
+        export interface GroupAlreadyCreated extends SequencedStatus<"GROUP_ALREADY_CREATED"> {
             group: string
         }
-        export interface NoSuchName extends BaseStatus<"NO_SUCH_NAME"> {
+        export interface NoSuchName extends SequencedStatus<"NO_SUCH_NAME"> {
             name: string
         }
-        export interface NoSuchUuid extends BaseStatus<"NO_SUCH_UUID"> {
+        export interface NoSuchUuid extends SequencedStatus<"NO_SUCH_UUID"> {
             uuid: Uuid
         }
-        export interface NoSuchGroup extends BaseStatus<"NO_SUCH_GROUP"> {
+        export interface NoSuchGroup extends SequencedStatus<"NO_SUCH_GROUP"> {
             group: string
         }
 
@@ -162,6 +152,7 @@ export class Client {
     private socket?: WebSocket;
     private version?: string;
     private secret?: string;
+    private seq: number = 0;
 
     reconnect: boolean;
     reconnectInterval: number = 10000;
@@ -185,11 +176,14 @@ export class Client {
         this.socket.onclose = event => this.onClose(event);
     }
 
-    sendJSON(payload: GenericPayload<any>) {
+    sendJSON(payload: GenericPayload<any>): number {
         if (this.socket == undefined) {
             throw new Error("Socket is not connected")
         }
         this.socket.send(JSON.stringify(payload));
+        let tmp = this.seq;
+        this.seq += 1;
+        return tmp;
     }
 
     close(code?: number, reason?: string, reconnect: boolean = true) {
