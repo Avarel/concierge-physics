@@ -53,7 +53,7 @@ export namespace Payloads {
         type: T
     }
 
-    interface HasGroupField {
+    interface GroupField {
         group: string
     }
 
@@ -67,11 +67,11 @@ export namespace Payloads {
         origin?: Origin,
         data: T
     }
-    export type Subscribe = BasePayload<"SUBSCRIBE"> & HasGroupField;
-    export type Unsubscribe = BasePayload<"UNSUBSCRIBE"> & HasGroupField;
-    export type CreateGroup = BasePayload<"CREATE_GROUP"> & HasGroupField;
-    export type DeleteGroup = BasePayload<"DELETE_GROUP"> & HasGroupField;
-    export type FetchGroupSubs = BasePayload<"FETCH_GROUP_SUB_LIST"> & HasGroupField;
+    export type Subscribe = BasePayload<"SUBSCRIBE"> & GroupField;
+    export type Unsubscribe = BasePayload<"UNSUBSCRIBE"> & GroupField;
+    export type CreateGroup = BasePayload<"CREATE_GROUP"> & GroupField;
+    export type DeleteGroup = BasePayload<"DELETE_GROUP"> & GroupField;
+    export type FetchGroupSubs = BasePayload<"FETCH_GROUP_SUB_LIST"> & GroupField;
     export type FetchGroupList = BasePayload<"FETCH_GROUP_LIST">;
     export type FetchClientList = BasePayload<"FETCH_CLIENT_LIST">;
     export type FetchSubList = BasePayload<"FETCH_SUB_LIST">;
@@ -79,7 +79,7 @@ export namespace Payloads {
         uuid: Uuid,
         version: string
     }
-    export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST">, HasGroupField {
+    export interface GroupSubs extends BasePayload<"GROUP_SUB_LIST">, GroupField {
         clients: Origin[]
     }
     export interface GroupList extends BasePayload<"GROUP_LIST"> {
@@ -107,10 +107,10 @@ export namespace Payloads {
 
         export type Ok = SequencedStatus<"OK">;
         export type MessageSent = SequencedStatus<"MESSAGE_SENT">;
-        export type Subscribed = SequencedStatus<"SUBSCRIBED"> & HasGroupField;
-        export type Unsubscribed = BaseStatus<"UNSUBSCRIBED"> & HasGroupField;
-        export type GroupCreated = BaseStatus<"GROUP_CREATED">  & HasGroupField;
-        export type GroupDeleted = BaseStatus<"GROUP_DELETED"> & HasGroupField;
+        export type Subscribed = SequencedStatus<"SUBSCRIBED"> & GroupField;
+        export type Unsubscribed = BaseStatus<"UNSUBSCRIBED"> & GroupField;
+        export type GroupCreated = BaseStatus<"GROUP_CREATED">  & GroupField;
+        export type GroupDeleted = BaseStatus<"GROUP_DELETED"> & GroupField;
         export type Bad = SequencedStatus<"BAD">;
         export type Unsupported = SequencedStatus<"UNSUPPORTED">;
         export interface Protocol extends SequencedStatus<"PROTOCOL"> {
@@ -319,8 +319,6 @@ export abstract class EventHandler implements RawHandler {
  */
 export abstract class ServiceEventHandler extends EventHandler {
     readonly client: Client;
-    protected subscribeInterval: number = 5000;
-    protected subscribeHandle: number | undefined;
     protected group: string;
 
     constructor(client: Client, group: string) {
@@ -331,24 +329,25 @@ export abstract class ServiceEventHandler extends EventHandler {
 
     onClose(_event: CloseEvent) {
         this.onUnsubscribe();
-        this.cancelSubscribe();
     }
 
-    /**
-     * Try to regularly subscribe to a group until it succeeds.
-     */
-    trySubscribe() {
-        // try to subscribe until good ("STATUS" handle)
-        let subFn = () => {
-            console.log("Attempting to subscribe to ", this.group);
-            this.client.sendJSON({
-                type: "SUBSCRIBE",
-                group: this.group
-            });
-        };
+    onRecvHello(_event: Payloads.Hello) {
+        this.client.sendJSON({
+            type: "FETCH_GROUP_LIST"
+        })
+    }
 
-        subFn();
-        this.subscribeHandle = window.setInterval(subFn, this.subscribeInterval);
+    onRecvGroupList(event: Payloads.GroupList) {
+        if (event.groups.includes(this.group)) {
+            this.subscribe(this.group);
+        }
+    }
+
+    private subscribe(group: string) {
+        this.client.sendJSON({
+            type: "SUBSCRIBE",
+            group
+        });
     }
 
     /**
@@ -361,35 +360,32 @@ export abstract class ServiceEventHandler extends EventHandler {
      */
     abstract onUnsubscribe(): void;
 
-    /**
-     * Cancels the process that tries to continuously subscribes to a group.
-     * This cancellation happens automatically when the handler successfully
-     * subscribes.
-     */
-    cancelSubscribe() {
-        clearInterval(this.subscribeHandle)
-        this.subscribeHandle = undefined;
-    }
-
     onRecvStatus(status: Payloads.Status): void {
         switch (status.code) {
             case "NO_SUCH_GROUP":
                 if (status.group == this.group) {
-                    console.error("Group `", this.group, "` does not exist on concierge, is the simulation server on?")
+                    console.error("Group `", this.group, "` does not exist on concierge.");
+                }
+                break;
+            case "GROUP_DELETED":
+                if (status.group == this.group) {
+                    console.warn("Group `", this.group, "` has been deleted on the concierge.");
+                }
+                break;
+            case "GROUP_CREATED":
+                if (status.group == this.group) {
+                    this.subscribe(this.group);
                 }
                 break;
             case "SUBSCRIBED":
                 if (status.group == this.group) {
-                    // subscription complete, stop trying to join
                     console.log("Subscribed to `", this.group, "`.");
-                    this.cancelSubscribe();
                     this.onSubscribe();
                 }
                 break;
             case "UNSUBSCRIBED":
                 if (status.group == this.group) {
                     console.log("Unsubscribed from `", this.group, "`.");
-                    this.trySubscribe();
                     this.onUnsubscribe();
                 }
                 break;

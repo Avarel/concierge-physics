@@ -82,10 +82,6 @@ export class PhysicsHandler extends ConciergeAPI.ServiceEventHandler {
         this.shapes = new Map();
     }
 
-    onRecvHello(hello: ConciergeAPI.Payloads.Hello) {
-        this.trySubscribe();
-    }
-
     onRecvMessage(message: ConciergeAPI.Payloads.Message<any>) {
         if (message.origin!.name != PHYSICS_ENGINE_NAME) {
             return;

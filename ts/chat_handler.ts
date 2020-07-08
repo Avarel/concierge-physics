@@ -16,11 +16,7 @@ export class ChatHandler extends ConciergeAPI.ServiceEventHandler {
         this.renderer = renderer;
         this.client = client;
     }
-
-    onRecvHello(hello: ConciergeAPI.Payloads.Hello) {
-        this.trySubscribe();
-    }
-
+    
     onSubscribe() {
         let panel = new GUI.StackPanel();
         panel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
